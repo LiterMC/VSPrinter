@@ -13,8 +13,11 @@ import com.github.litermc.vsprinter.platform.RegistryEntry;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -26,11 +29,20 @@ import java.util.function.BiFunction;
 public final class VSPRegistry {
 	private VSPRegistry() {}
 
+	public static void register() {
+		Blocks.REGISTRY.register();
+		BlockEntities.REGISTRY.register();
+		Items.REGISTRY.register();
+		CreativeTabs.REGISTRY.register();
+	}
+
 	public static final class Blocks {
 		private static final RegistrationHelper<Block> REGISTRY = PlatformHelper.get().createRegistrationHelper(Registries.BLOCK);
 
 		public static final RegistryEntry<Block> PRINTER_CONTROLLER =
 			REGISTRY.register("printer_controller", () -> new PrinterControllerBlock(BlockBehaviour.Properties.of().strength(3f)));
+		public static final RegistryEntry<Block> PRINTER_FRAME =
+			REGISTRY.register("printer_frame", () -> new PrinterFrameBlock(BlockBehaviour.Properties.of().strength(4f)));
 
 		private Blocks() {}
 	}
@@ -60,7 +72,21 @@ public final class VSPRegistry {
 		}
 
 		public static final RegistryEntry<BlockItem> PRINTER_CONTROLLER = ofBlock(Blocks.PRINTER_CONTROLLER, BlockItem::new);
+		public static final RegistryEntry<BlockItem> PRINTER_FRAME = ofBlock(Blocks.PRINTER_FRAME, BlockItem::new);
 
 		private Items() {}
+	}
+	
+	static class CreativeTabs {
+		static final RegistrationHelper<CreativeModeTab> REGISTRY = PlatformHelper.get().createRegistrationHelper(Registries.CREATIVE_MODE_TAB);
+
+		private static final RegistryEntry<CreativeModeTab> TAB = REGISTRY.register("tab", () -> PlatformHelper.get().newCreativeModeTab()
+			.icon(() -> new ItemStack(Items.PRINTER_CONTROLLER.get()))
+			.title(Component.translatable("itemGroup.vsprinter"))
+			.displayItems((context, out) -> {
+				out.accept(Items.PRINTER_CONTROLLER.get());
+				out.accept(Items.PRINTER_FRAME.get());
+			})
+			.build());
 	}
 }
