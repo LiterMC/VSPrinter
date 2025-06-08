@@ -1,6 +1,8 @@
 package com.github.litermc.vsprinter.block;
 
 import com.github.litermc.vsprinter.VSPRegistry;
+import com.github.litermc.vsprinter.api.PrintArguments;
+import com.github.litermc.vsprinter.api.PrintSchema;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -24,6 +26,7 @@ import net.minecraft.world.phys.AABB;
 import org.joml.primitives.AABBi;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class PrinterControllerBlockEntity extends BlockEntity {
@@ -32,6 +35,10 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	private AABB frameCache = null;
 	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
+	private PrintArguments printArgs = null;
+	private PrintSchema blueprint = null;
+	private Iterator<PrintSchema.BlockData> printing = null;
+	private int progress = 0;
 
 	public PrinterControllerBlockEntity(final BlockPos pos, final BlockState state) {
 		super(VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get(), pos, state);
@@ -55,6 +62,18 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 				this.items.put(item, amount);
 			}
 		}
+		if (data.contains("PrintArgs")) {
+			this.printArgs = PrintArguments.readFromNbt(data.getCompound("PrintArgs"));
+			this.blueprint = this.loadBluePrint(this.printArgs.blueprint()); // TODO: load fingerprint instead
+			if (this.blueprint == null) {
+				this.printArgs = null;
+			} else {
+				this.progress = data.getInt("Progress");
+				this.printing = this.blueprint.stream().skip(this.progress).iterator();
+			}
+		} else {
+			this.printArgs = null;
+		}
 	}
 
 	@Override
@@ -67,6 +86,10 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			}
 		}
 		data.put("Items", items);
+		if (this.printArgs != null) {
+			data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
+			data.putInt("Progress", this.progress);
+		}
 	}
 
 	public AABB getFrameSpace() {
@@ -94,5 +117,19 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			box.minX + frameSize, box.minY + frameSize, box.minZ + frameSize,
 			box.maxX - frameSize, box.maxY - frameSize, box.maxZ - frameSize
 		);
+	}
+
+	public PrintSchema loadBluePrint(final String name) {
+		return null;
+	}
+
+	/**
+	 * Start printing model
+	 *
+	 * @param arg The print argument
+	 * @return start print error string, or {@code null} if action succeed
+	 */
+	public String startPrint(final PrintArguments args) {
+		return null;
 	}
 }
