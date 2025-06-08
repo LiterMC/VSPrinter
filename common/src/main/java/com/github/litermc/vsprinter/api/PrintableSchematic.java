@@ -28,13 +28,13 @@ import java.util.List;
 import java.util.function.BiPredicate;
 import java.util.stream.Stream;
 
-public class PrintSchema {
+public class PrintableSchematic {
 	private String fingerprint;
 	private final BlockPosBitSet posList;
 	private final List<BlockState> blocks;
 	private final List<CompoundTag> datas;
 
-	protected PrintSchema(
+	protected PrintableSchematic(
 		final String fingerprint,
 		final BlockPosBitSet posList,
 		final List<BlockState> blocks,
@@ -46,7 +46,7 @@ public class PrintSchema {
 		this.datas = datas;
 	}
 
-	public PrintSchema(
+	public PrintableSchematic(
 		final BlockPosBitSet posList,
 		final List<BlockState> blocks,
 		final List<CompoundTag> datas
@@ -95,11 +95,11 @@ public class PrintSchema {
 		return List.of(new ItemStack(item, 1));
 	}
 
-	public static PrintSchema fromLevel(final Level level, final AABBic area) {
+	public static PrintableSchematic fromLevel(final Level level, final AABBic area) {
 		return fromLevel(level, area, (l, p) -> true);
 	}
 
-	public static PrintSchema fromLevel(final Level level, final AABBic area, final BiPredicate<Level, BlockPos> validator) {
+	public static PrintableSchematic fromLevel(final Level level, final AABBic area, final BiPredicate<Level, BlockPos> validator) {
 		final BlockPos min = new BlockPos(area.minX(), area.minY(), area.minZ());
 		final BlockPos max = new BlockPos(area.maxX() + 1, area.maxY() + 1, area.maxZ() + 1);
 		final BlockPosBitSet posList = new BlockPosBitSet(max.subtract(min));
@@ -118,16 +118,16 @@ public class PrintSchema {
 					}
 					posList.set(cursor);
 					blocks.add(state);
-					datas.add(level.getBlockEntity(cursor) instanceof ISchemaDataBlockEntity dataBlock ? dataBlock.getPrintSchemaData() : null);
+					datas.add(level.getBlockEntity(cursor) instanceof ISchematicDataBlockEntity dataBlock ? dataBlock.getPrintableSchematicData() : null);
 				}
 			}
 		}
 		blocks.trimToSize();
 		datas.trimToSize();
-		return new PrintSchema(posList, blocks, datas);
+		return new PrintableSchematic(posList, blocks, datas);
 	}
 
-	public static PrintSchema readFrom(final FriendlyByteBuf buf) {
+	public static PrintableSchematic readFrom(final FriendlyByteBuf buf) {
 		final int startIndex = buf.readerIndex();
 		final BlockPosBitSet posList = BlockPosBitSet.readFrom(buf);
 		final int size = posList.cardinality();
@@ -148,7 +148,7 @@ public class PrintSchema {
 		final int endIndex = buf.readerIndex();
 		final String fingerprint = calculateFingerprint(buf.nioBuffer(startIndex, endIndex - startIndex));
 
-		return new PrintSchema(fingerprint, posList, blocks, datas);
+		return new PrintableSchematic(fingerprint, posList, blocks, datas);
 	}
 
 	public void writeTo(final FriendlyByteBuf buf) {
@@ -202,5 +202,15 @@ public class PrintSchema {
 		}
 		md.update(buf);
 		return HexFormat.of().formatHex(md.digest());
+	}
+
+	public void placeInLevel(final Level level, final BlockPos origin) {
+		this.stream().forEach((data) -> {
+			final BlockPos target = origin.offset(data.position());
+			level.setBlock(target, data.blockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+			if (level.getBlockEntity(target) instanceof ISchematicDataBlockEntity dataBlock) {
+				dataBlock.loadPrintableSchematicData(data.data());
+			}
+		});
 	}
 }

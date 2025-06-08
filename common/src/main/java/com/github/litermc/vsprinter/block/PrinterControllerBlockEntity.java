@@ -2,7 +2,7 @@ package com.github.litermc.vsprinter.block;
 
 import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.api.PrintArguments;
-import com.github.litermc.vsprinter.api.PrintSchema;
+import com.github.litermc.vsprinter.api.PrintableSchematic;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -36,8 +36,8 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
 	private PrintArguments printArgs = null;
-	private PrintSchema blueprint = null;
-	private Iterator<PrintSchema.BlockData> printing = null;
+	private PrintableSchematic blueprint = null;
+	private Iterator<PrintableSchematic.BlockData> printing = null;
 	private int progress = 0;
 
 	public PrinterControllerBlockEntity(final BlockPos pos, final BlockState state) {
@@ -122,7 +122,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		);
 	}
 
-	public PrintSchema loadBluePrint(final String name) {
+	public PrintableSchematic loadBluePrint(final String fingerprint) {
 		return null;
 	}
 

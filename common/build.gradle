@@ -21,8 +21,8 @@ dependencies {
 	implementation "com.google.auto.service:auto-service:1.1.1"
 	annotationProcessor "com.google.auto.service:auto-service:1.1.1"
 
-	implementation "org.joml:joml:1.10.5"
-	implementation "org.joml:joml-primitives:1.10.0"
+	compileOnly "org.joml:joml:1.10.5"
+	compileOnly "org.joml:joml-primitives:1.10.0"
 
 	modCompileOnly "org.valkyrienskies:valkyrienskies-120-common:${vs2_version}"
 
