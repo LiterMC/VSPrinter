@@ -64,15 +64,15 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		}
 		if (data.contains("PrintArgs")) {
 			this.printArgs = PrintArguments.readFromNbt(data.getCompound("PrintArgs"));
-			this.blueprint = this.loadBluePrint(this.printArgs.blueprint()); // TODO: load fingerprint instead
-			if (this.blueprint == null) {
-				this.printArgs = null;
-			} else {
+		} else {
+			this.printArgs = null;
+		}
+		if (data.contains("Blueprint")) {
+			this.blueprint = this.loadBluePrint(data.getString("Blueprint"));
+			if (this.blueprint != null) {
 				this.progress = data.getInt("Progress");
 				this.printing = this.blueprint.stream().skip(this.progress).iterator();
 			}
-		} else {
-			this.printArgs = null;
 		}
 	}
 
@@ -88,6 +88,9 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		data.put("Items", items);
 		if (this.printArgs != null) {
 			data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
+		}
+		if (this.blueprint != null) {
+			data.putString("Blueprint", this.blueprint.getFingerprint());
 			data.putInt("Progress", this.progress);
 		}
 	}
