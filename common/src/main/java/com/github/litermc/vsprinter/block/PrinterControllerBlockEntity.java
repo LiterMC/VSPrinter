@@ -3,6 +3,7 @@ package com.github.litermc.vsprinter.block;
 import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.api.PrintArguments;
 import com.github.litermc.vsprinter.api.PrintableSchematic;
+import com.github.litermc.vsprinter.api.SchematicManager;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -68,7 +69,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			this.printArgs = null;
 		}
 		if (data.contains("Blueprint")) {
-			this.blueprint = this.loadBluePrint(data.getString("Blueprint"));
+			this.blueprint = SchematicManager.get().getSchematic(data.getString("Blueprint"));
 			if (this.blueprint != null) {
 				this.progress = data.getInt("Progress");
 				this.printing = this.blueprint.stream().skip(this.progress).iterator();
@@ -120,10 +121,6 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			box.minX + frameSize, box.minY + frameSize, box.minZ + frameSize,
 			box.maxX - frameSize, box.maxY - frameSize, box.maxZ - frameSize
 		);
-	}
-
-	public PrintableSchematic loadBluePrint(final String fingerprint) {
-		return null;
 	}
 
 	/**

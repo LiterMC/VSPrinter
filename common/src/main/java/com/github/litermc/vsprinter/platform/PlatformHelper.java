@@ -17,6 +17,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -49,6 +50,8 @@ public interface PlatformHelper {
 	 * @return If we're running in a development environment.
 	 */
 	boolean isDevelopmentEnvironment();
+
+	MinecraftServer getCurrentServer();
 
 	/**
 	 * Wrap a Minecraft registry in our own abstraction layer.

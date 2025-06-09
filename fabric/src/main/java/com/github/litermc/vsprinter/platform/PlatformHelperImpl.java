@@ -43,6 +43,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.ItemTags;
@@ -82,9 +83,16 @@ import java.util.function.Supplier;
 
 @AutoService(PlatformHelper.class)
 public class PlatformHelperImpl implements PlatformHelper {
+	public static volatile MinecraftServer minecraftServer = null;
+
 	@Override
 	public boolean isDevelopmentEnvironment() {
 		return FabricLoader.getInstance().isDevelopmentEnvironment();
+	}
+
+	@Override
+	public MinecraftServer getCurrentServer() {
+		return minecraftServer;
 	}
 
 	@SuppressWarnings("unchecked")

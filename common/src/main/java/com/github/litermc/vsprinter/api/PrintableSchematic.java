@@ -3,7 +3,6 @@ package com.github.litermc.vsprinter.api;
 import com.github.litermc.vsprinter.util.BlockPosBitSet;
 import com.github.litermc.vsprinter.util.IntRef;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
