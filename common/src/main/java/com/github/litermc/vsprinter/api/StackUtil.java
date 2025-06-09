@@ -15,7 +15,9 @@ public final class StackUtil {
 	public static ItemStack setStackToUnits(final ItemStack stack) {
 		final Item item = stack.getItem();
 		if (item.canBeDepleted()) {
-			stack.setCount(stack.getCount() * item.getMaxDamage());
+			final int remainDamage = item.getMaxDamage() - stack.getDamageValue();
+			stack.removeTagKey(ItemStack.TAG_DAMAGE);
+			stack.setCount(stack.getCount() * remainDamage);
 		} else {
 			stack.setCount(stack.getCount() * UNIT);
 		}

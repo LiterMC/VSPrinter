@@ -49,6 +49,66 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		this.frameCache = null;
 	}
 
+	/**
+	 * put an item to the printer's storage
+	 *
+	 * @return {@code true} if action succeed, otherwise {@code false}
+	 */
+	public boolean putItemUnit(final ItemStack stack) {
+		final CompoundTag tag = stack.getTag();
+		if (tag == null || tag.isEmpty()) {
+			this.items.computeInt(stack.getItem(), (i, v) -> (v == null ? 0 : v) + stack.getCount());
+			return true;
+		}
+		for (final ItemStack s : this.nbtItems) {
+			if (stack.getItem() == s.getItem() && tag.equals(s.getTag())) {
+				s.grow(stack.getCount());
+				return true;
+			}
+		}
+		if (this.nbtItems.size() < 64) {
+			this.nbtItems.add(stack);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * try consume an item
+	 *
+	 * @return {@code 0} if consume succeed, or the amount of unit missing
+	 */
+	protected int tryConsumeUnit(final ItemStack stack) {
+		final CompoundTag tag = stack.getTag();
+		if (tag == null || tag.isEmpty()) {
+			final int count = this.items.getOrDefault(stack.getItem(), 0);
+			final int remain = count - stack.getConut();
+			if (remain < 0) {
+				return -remain;
+			}
+			this.items.put(stack.getItem(), remain);
+			return 0;
+		}
+		for (int i = 0; i < this.nbtItems.size(); i++) {
+			final ItemStack s = this.nbtItems.get(i);
+			if (stack.getItem() != s.getItem() || !tag.equals(s.getTag())) {
+				continue;
+			}
+			final int remain = s.getCount() - stack.getCount();
+			if (remain < 0) {
+				return -remain;
+			}
+			s.setCount(remain);
+			if (remain == 0) {
+				final int lastIndex = this.nbtItems.size() - 1;
+				this.nbtItems.set(i, this.nbtItems.get(lastIndex));
+				this.nbtItems.remove(lastIndex);
+			}
+			return 0;
+		}
+		return stack.getCount();
+	}
+
 	@Override
 	public void load(final CompoundTag data) {
 		final CompoundTag items = data.getCompound("Items");
@@ -61,6 +121,17 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			final int amount = items.getInt(id);
 			if (amount > 0) {
 				this.items.put(item, amount);
+			}
+		}
+		final ListTag nbtItems = data.getList("NbtItems");
+		this.nbtItems.clear();
+		for (final Tag tag : nbtItems) {
+			if (!(tag instanceof CompoundTag comp)) {
+				continue;
+			}
+			final ItemStack stack = ItemStack.of(comp);
+			if (!stack.isEmpty()) {
+				this.nbtItems.add(stack);
 			}
 		}
 		if (data.contains("PrintArgs")) {
@@ -87,6 +158,13 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			}
 		}
 		data.put("Items", items);
+		final ListTag nbtItems = new ListTag();
+		for (final ItemStack stack : this.nbtItems) {
+			if (!stack.isEmpty()) {
+				nbtItems.add(stack.save(new CompoundTag()));
+			}
+		}
+		data.put("NbtItems", nbtItems);
 		if (this.printArgs != null) {
 			data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
 		}
