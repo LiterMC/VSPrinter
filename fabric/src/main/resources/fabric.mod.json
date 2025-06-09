@@ -24,10 +24,11 @@
 		"${mod_id}.mixins.json"
 	],
 	"depends": {
-		"fabricloader": ">=0.16",
 		"fabric": "*",
+		"fabricloader": ">=0.16",
+		"java": ">=17",
 		"minecraft": "${minecraft_version}",
-		"java": ">=17"
+		"valkyrienskies": "*"
 	}
 }
   

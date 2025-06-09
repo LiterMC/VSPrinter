@@ -24,21 +24,33 @@ repositories {
 				url = 'https://repo.spongepowered.org/repository/maven-public'
 			}
 		}
-		filter { includeGroupAndSubgroups('org.spongepowered') }
+		filter {
+			includeGroupAndSubgroups('org.spongepowered')
+		}
 	}
 
 	exclusiveContent {
 		forRepositories(
-				maven {
-					name = 'ParchmentMC'
-					url = 'https://maven.parchmentmc.org/'
-				},
-				maven {
-					name = "NeoForge"
-					url = 'https://maven.neoforged.net/releases'
-				}
+			maven {
+				name = 'ParchmentMC'
+				url = 'https://maven.parchmentmc.org'
+			},
+			maven {
+				name = "NeoForge"
+				url = 'https://maven.neoforged.net/releases'
+			}
 		)
-		filter { includeGroup('org.parchmentmc.data') }
+		filter {
+			includeGroup('org.parchmentmc.data')
+		}
+	}
+
+	maven {
+		name = 'Fabric'
+		url = 'https://maven.fabricmc.net'
+		content {
+			includeGroupAndSubgroups('net.fabricmc')
+		}
 	}
 
 	maven {
@@ -48,7 +60,7 @@ repositories {
 
 	maven {
 		name = 'Kotlin for Forge'
-		url = 'https://thedarkcolour.github.io/KotlinForForge/'
+		url = 'https://thedarkcolour.github.io/KotlinForForge'
 		content {
 			includeGroup('thedarkcolour')
 		}
@@ -58,11 +70,10 @@ repositories {
 		name = 'Valkyrien Skies'
 		url = 'https://maven.valkyrienskies.org'
 		content {
-			includeGroup('org.valkyrienskies')
-			includeGroup('org.valkyrienskies.core')
 			includeGroup('com.github.Rubydesic')
 			includeGroup('me.shedaniel.cloth')
 			includeGroup('org.mapstruct')
+			includeGroupAndSubgroups('org.valkyrienskies')
 		}
 	}
 
@@ -71,6 +82,65 @@ repositories {
 		url = 'https://api.modrinth.com/maven'
 		content {
 			includeGroup('maven.modrinth')
+		}
+	}
+
+	maven {
+		name = 'Create Mod Forge 0.5'
+		url = 'https://maven.tterrag.com'
+		content {
+			includeGroup('com.jozufozu.flywheel')
+			includeGroup('com.simibubi.create')
+			includeGroup('com.tterrag.registrate')
+		}
+	}
+
+	maven {
+		name = 'Create Mod 6.0'
+		url = 'https://maven.createmod.net'
+		content {
+			includeGroup('com.simibubi.create')
+			includeGroup('dev.engine-room.flywheel')
+			includeGroup('net.createmod.ponder')
+		}
+	}
+
+	maven {
+		name = 'Create Mod Fabric Snapshots'
+		url = 'https://mvn.devos.one/snapshots'
+		content {
+			includeGroup('com.simibubi.create')
+			includeGroup('com.tterrag.registrate_fabric')
+			includeGroup('io.github.fabricators_of_create.Porting-Lib')
+			includeGroup('io.github.tropheusj')
+		}
+	}
+
+	maven {
+		name = 'Create Mod Fabric Releases'
+		url = 'https://mvn.devos.one/releases'
+		content {
+			includeGroup('com.simibubi.create')
+			includeGroup('com.tterrag.registrate_fabric')
+			includeGroup('io.github.fabricators_of_create.Porting-Lib')
+			includeGroup('io.github.tropheusj')
+		}
+	}
+
+	maven {
+		name = 'Forge Config API Port'
+		url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven'
+		content {
+			includeGroup('net.minecraftforge')
+			includeGroupAndSubgroups('fuzs')
+		}
+	}
+
+	maven {
+		name = 'Reach Entity Attributes'
+		url = 'https://maven.jamieswhiteshirt.com/libs-release'
+		content {
+			includeGroup('com.jamieswhiteshirt')
 		}
 	}
 }

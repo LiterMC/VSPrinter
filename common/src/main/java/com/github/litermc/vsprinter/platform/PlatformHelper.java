@@ -53,6 +53,8 @@ public interface PlatformHelper {
 
 	MinecraftServer getCurrentServer();
 
+	boolean isModLoaded(String modid);
+
 	/**
 	 * Wrap a Minecraft registry in our own abstraction layer.
 	 *

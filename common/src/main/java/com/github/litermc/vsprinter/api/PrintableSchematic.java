@@ -1,7 +1,11 @@
 package com.github.litermc.vsprinter.api;
 
+import com.github.litermc.vsprinter.compat.Compats;
+import com.github.litermc.vsprinter.compat.create.CreateCompat;
 import com.github.litermc.vsprinter.util.BlockPosBitSet;
 import com.github.litermc.vsprinter.util.IntRef;
+
+import com.simibubi.create.content.schematics.requirement.ISpecialBlockItemRequirement;
 
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
@@ -81,17 +85,24 @@ public class PrintableSchematic {
 
 	public record BlockData(BlockPos position, BlockState blockState, CompoundTag data) {
 		public List<ItemStack> requiredItems() {
-			return getBlockDefaultRequiredItems(this.blockState);
+			final Block block = this.blockState.getBlock();
+			if (block instanceof ISchematicSpecialBlock specialBlock) {
+				return specialBlock.getPrintRequiredUnits(this.blockState, this.data);
+			}
+			if (Compats.CREATE.isLoaded() && block instanceof ISpecialBlockItemRequirement specialBlock) {
+				return CreateCompat.convertItemRequirementToUnits(specialBlock.getRequiredItems(this.blockState, null));
+			}
+			return getBlockDefaultRequiredUnits(this.blockState);
 		}
 	}
 
-	private static List<ItemStack> getBlockDefaultRequiredItems(final BlockState state) {
+	private static List<ItemStack> getBlockDefaultRequiredUnits(final BlockState state) {
 		final Block block = state.getBlock();
 		final Item item = block.asItem();
 		if (item == Items.AIR) {
 			return null;
 		}
-		return List.of(new ItemStack(item, 1));
+		return List.of(StackUtil.setStackToUnits(new ItemStack(item, 1)));
 	}
 
 	public static PrintableSchematic fromLevel(final Level level, final AABBic area) {

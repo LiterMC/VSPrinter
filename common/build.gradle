@@ -1,6 +1,7 @@
 plugins {
 	id 'multiloader-common'
 	id 'net.neoforged.moddev.legacyforge'
+	id("io.github.redgreencoding.findclass") version "0.0.2"
 }
 
 legacyForge {
@@ -17,6 +18,10 @@ legacyForge {
 dependencies {
 	compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
 	implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
+	// mappings loom.layered() {
+	// 	officialMojangMappings()
+	// 	parchment("org.parchmentmc.data:parchment-${parchment_minecraft}:${parchment_version}@zip")
+	// }
 
 	implementation "com.google.auto.service:auto-service:1.1.1"
 	annotationProcessor "com.google.auto.service:auto-service:1.1.1"
@@ -30,6 +35,8 @@ dependencies {
 	modCompileOnly "org.valkyrienskies.core:api-game:${vs_core_version}"
 	modCompileOnly "org.valkyrienskies.core:util:${vs_core_version}"
 	modCompileOnly "org.valkyrienskies.core:impl:${vs_core_version}"
+
+	modCompileOnly("com.simibubi.create:create-${minecraft_version}:${create_forge_version}:all") { transitive = false }
 }
 
 configurations {

@@ -24,6 +24,8 @@ dependencies {
 
 	modCompileOnly "maven.modrinth:jade:${jade_version}+fabric"
 	modRuntimeOnly "maven.modrinth:jade:${jade_version}+fabric"
+	modCompileOnly "com.simibubi.create:create-fabric-${minecraft_version}:${create_fabric_version}"
+	modRuntimeOnly "com.simibubi.create:create-fabric-${minecraft_version}:${create_fabric_version}"
 }
 
 loom {

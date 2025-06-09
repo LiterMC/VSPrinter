@@ -33,13 +33,20 @@ ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.${mod_id}]]
-modId = "jade"
+modId = "valkyrienskies"
+mandatory = true
+versionRange = "[2.3,)"
+ordering = "BEFORE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "create"
 mandatory = false
-versionRange = "*"
+versionRange = "(,0.6)"
 ordering = "BEFORE"
 side = "BOTH"
 [[dependencies.${mod_id}]]
-modId = "valkyrienskies"
+modId = "jade"
 mandatory = false
 versionRange = "*"
 ordering = "BEFORE"

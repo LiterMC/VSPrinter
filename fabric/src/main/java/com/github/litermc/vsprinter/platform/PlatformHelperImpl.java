@@ -82,7 +82,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 @AutoService(PlatformHelper.class)
-public class PlatformHelperImpl implements PlatformHelper {
+public final class PlatformHelperImpl implements PlatformHelper {
 	public static volatile MinecraftServer minecraftServer = null;
 
 	@Override
@@ -93,6 +93,11 @@ public class PlatformHelperImpl implements PlatformHelper {
 	@Override
 	public MinecraftServer getCurrentServer() {
 		return minecraftServer;
+	}
+
+	@Override
+	public boolean isModLoaded(String modid) {
+		return FabricLoader.getInstance().isModLoaded(modid);
 	}
 
 	@SuppressWarnings("unchecked")
