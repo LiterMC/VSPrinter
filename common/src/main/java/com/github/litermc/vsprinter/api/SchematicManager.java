@@ -13,9 +13,11 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
@@ -49,7 +51,13 @@ public final class SchematicManager {
 	}
 
 	private File getSchematicFile(final String fingerprint) {
-		return this.server.getWorldPath(LevelResource.ROOT).resolve(SCHEMA_DIR).resolve(fingerprint + ".dat").toFile();
+		final Path dirPath = this.server.getWorldPath(LevelResource.ROOT).resolve(SCHEMA_DIR);
+		try {
+			Files.createDirectories(dirPath);
+		} catch (IOException e) {
+			Constants.LOG.error("[VSP]: Cannot create schematic directory", e);
+		}
+		return dirPath.resolve(fingerprint + ".dat").toFile();
 	}
 
 	private PrintableSchematic loadSchematic(final String fingerprint) {

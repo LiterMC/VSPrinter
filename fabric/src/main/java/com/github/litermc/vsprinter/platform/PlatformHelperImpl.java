@@ -4,16 +4,17 @@
 
 package com.github.litermc.vsprinter.platform;
 
-import com.google.auto.service.AutoService;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.mojang.authlib.GameProfile;
-import com.mojang.brigadier.arguments.ArgumentType;
 import com.github.litermc.vsprinter.Constants;
 import com.github.litermc.vsprinter.network.MessageType;
 import com.github.litermc.vsprinter.network.NetworkMessage;
 import com.github.litermc.vsprinter.network.client.ClientNetworkContext;
 import com.github.litermc.vsprinter.network.container.ContainerData;
+
+import com.google.auto.service.AutoService;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.arguments.ArgumentType;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;

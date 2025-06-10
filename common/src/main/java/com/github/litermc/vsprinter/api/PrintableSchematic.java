@@ -111,22 +111,22 @@ public class PrintableSchematic {
 
 	public static PrintableSchematic fromLevel(final Level level, final AABBic area, final BiPredicate<Level, BlockPos> validator) {
 		final BlockPos min = new BlockPos(area.minX(), area.minY(), area.minZ());
-		final BlockPos max = new BlockPos(area.maxX() + 1, area.maxY() + 1, area.maxZ() + 1);
-		final BlockPosBitSet posList = new BlockPosBitSet(max.subtract(min));
+		final BlockPos dimension = new BlockPos(area.maxX() + 1, area.maxY() + 1, area.maxZ() + 1).subtract(min);
+		final BlockPosBitSet posList = new BlockPosBitSet(dimension);
 		final ArrayList<BlockState> blocks = new ArrayList<>();
 		final ArrayList<CompoundTag> datas = new ArrayList<>();
 		final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-		for (int y = min.getY(); y < max.getY(); y++) {
-			for (int z = min.getZ(); z < max.getZ(); z++) {
-				for (int x = min.getX(); x < max.getX(); x++) {
-					final BlockState state = level.getBlockState(cursor.set(x, y, z));
+		for (int y = 0; y < dimension.getY(); y++) {
+			for (int z = 0; z < dimension.getZ(); z++) {
+				for (int x = 0; x < dimension.getX(); x++) {
+					final BlockState state = level.getBlockState(cursor.setWithOffset(min, x, y, z));
 					if (state.isAir()) {
 						continue;
 					}
 					if (!validator.test(level, cursor)) {
 						return null;
 					}
-					posList.set(cursor);
+					posList.set(x, y, z);
 					blocks.add(state);
 					datas.add(level.getBlockEntity(cursor) instanceof ISchematicDataBlockEntity dataBlock ? dataBlock.getPrintableSchematicData() : null);
 				}

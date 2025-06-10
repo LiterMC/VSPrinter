@@ -7,6 +7,7 @@ package com.github.litermc.vsprinter;
 import com.github.litermc.vsprinter.block.PrinterControllerBlock;
 import com.github.litermc.vsprinter.block.PrinterControllerBlockEntity;
 import com.github.litermc.vsprinter.block.PrinterFrameBlock;
+import com.github.litermc.vsprinter.item.QuantumFilmItem;
 import com.github.litermc.vsprinter.platform.PlatformHelper;
 import com.github.litermc.vsprinter.platform.RegistrationHelper;
 import com.github.litermc.vsprinter.platform.RegistryEntry;
@@ -18,6 +19,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Rarity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -73,6 +75,9 @@ public final class VSPRegistry {
 
 		public static final RegistryEntry<BlockItem> PRINTER_CONTROLLER = ofBlock(Blocks.PRINTER_CONTROLLER, BlockItem::new);
 		public static final RegistryEntry<BlockItem> PRINTER_FRAME = ofBlock(Blocks.PRINTER_FRAME, BlockItem::new);
+		public static final RegistryEntry<Item> QUANTUM_FILM = REGISTRY.register("quantum_film", () -> new QuantumFilmItem(
+			properties().stacksTo(1).rarity(Rarity.UNCOMMON)
+		));
 
 		private Items() {}
 	}
