@@ -1,16 +1,23 @@
 plugins {
 	id 'multiloader-loader'
-	id 'fabric-loom'
+	// id 'fabric-loom'
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'com.modrinth.minotaur' version '2.+'
 }
 
-dependencies {
-	minecraft "com.mojang:minecraft:${minecraft_version}"
-	mappings loom.layered {
-		officialMojangMappings()
-		parchment("org.parchmentmc.data:parchment-${parchment_minecraft}:${parchment_version}@zip")
-	}
+architectury {
+	fabric()
+}
 
+configurations {
+	common
+	shadowCommon
+	compileClasspath.extendsFrom common
+	runtimeClasspath.extendsFrom common
+	developmentFabric.extendsFrom common
+}
+
+dependencies {
 	modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 	implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
@@ -18,9 +25,10 @@ dependencies {
 	implementation "com.google.auto.service:auto-service:1.1.1"
 	annotationProcessor "com.google.auto.service:auto-service:1.1.1"
 
-	modCompileOnly "org.valkyrienskies:valkyrienskies-120-fabric:${vs2_version}"
-	modRuntimeOnly "org.valkyrienskies.core:api:${vs_core_version}"
-	modRuntimeOnly "org.valkyrienskies:valkyrienskies-120-fabric:${vs2_version}"
+	modRuntimeOnly "com.terraformersmc:modmenu:3.2.3"
+	modRuntimeOnly "me.shedaniel.cloth:cloth-config:${cloth_config_version}"
+
+	modApi "org.valkyrienskies:valkyrienskies-120-fabric:${vs2_version}"
 
 	modCompileOnly "maven.modrinth:jade:${jade_version}+fabric"
 	modRuntimeOnly "maven.modrinth:jade:${jade_version}+fabric"
@@ -29,9 +37,7 @@ dependencies {
 }
 
 loom {
-	if (project(":common").file("src/main/resources/${mod_id}.accesswidener").exists()) {
-		accessWidenerPath.set(project(":common").file("src/main/resources/${mod_id}.accesswidener"))
-	}
+	accessWidenerPath = project(":common").loom.accessWidenerPath
 	mixin {
 		defaultRefmapName.set("${mod_id}.refmap.json")
 	}
@@ -48,6 +54,12 @@ loom {
 			ideConfigGenerated(true)
 			runDir("run")
 		}
+	}
+}
+
+components.java {
+	withVariantsFromConfiguration(project.configurations.shadowRuntimeElements) {
+		skip()
 	}
 }
 

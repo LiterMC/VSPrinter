@@ -1,40 +1,39 @@
 plugins {
 	id 'multiloader-common'
-	id 'net.neoforged.moddev.legacyforge'
-	id("io.github.redgreencoding.findclass") version "0.0.2"
 }
 
-legacyForge {
-	mcpVersion = minecraft_version
-	if (file("src/main/resources/META-INF/accesstransformer.cfg").exists()) {
-		accessTransformers = ["src/main/resources/META-INF/accesstransformer.cfg"]
-	}
-	parchment {
-		minecraftVersion = parchment_minecraft
-		mappingsVersion = parchment_version
-	}
+architectury {
+	common('fabric', 'forge')
+}
+
+loom {
+	accessWidenerPath = file("src/main/resources/${mod_id}.accesswidener")
 }
 
 dependencies {
+	// We depend on fabric loader here to use the fabric @Environment annotations and get the mixin dependencies
+	// Do NOT use other classes from fabric loader
+	modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+
 	compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
 	implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
-	// mappings loom.layered() {
-	// 	officialMojangMappings()
-	// 	parchment("org.parchmentmc.data:parchment-${parchment_minecraft}:${parchment_version}@zip")
-	// }
 
 	implementation "com.google.auto.service:auto-service:1.1.1"
 	annotationProcessor "com.google.auto.service:auto-service:1.1.1"
 
-	compileOnly "org.joml:joml:1.10.5"
-	compileOnly "org.joml:joml-primitives:1.10.0"
+	// Architectury API
+	// NOTE: This is only for the platform-independent API stuff.
+	// This WILL make your Forge jar depend on Architectury API
+	// This is OPTIONAL. You can still use architectury, just without this API.
+	// (You'll just have to do more loader-specific stuff)
+	modApi "dev.architectury:architectury:${rootProject.architectury_version}"
 
-	modCompileOnly "org.valkyrienskies:valkyrienskies-120-common:${vs2_version}"
+	modApi "org.valkyrienskies:valkyrienskies-120-common:${vs2_version}"
 
-	modCompileOnly "org.valkyrienskies.core:api:${vs_core_version}"
-	modCompileOnly "org.valkyrienskies.core:api-game:${vs_core_version}"
-	modCompileOnly "org.valkyrienskies.core:util:${vs_core_version}"
-	modCompileOnly "org.valkyrienskies.core:impl:${vs_core_version}"
+	implementation "org.valkyrienskies.core:api:${vs_core_version}"
+	implementation "org.valkyrienskies.core:api-game:${vs_core_version}"
+	implementation "org.valkyrienskies.core:util:${vs_core_version}"
+	implementation "org.valkyrienskies.core:impl:${vs_core_version}"
 
 	modCompileOnly("com.simibubi.create:create-${minecraft_version}:${create_forge_version}:all") { transitive = false }
 }
