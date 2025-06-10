@@ -1,9 +1,11 @@
 package com.github.litermc.vsprinter.block;
 
+import com.github.litermc.vsprinter.Constants;
 import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.api.PrintArguments;
 import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
+import com.github.litermc.vsprinter.item.QuantumFilmItem;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -86,7 +88,15 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		if (!this.blueprintItem.isEmpty()) {
 			return false;
 		}
+		final String fingerprint = QuantumFilmItem.getBlueprint(item);
+		if (fingerprint == null) {
+			return false;
+		}
 		this.blueprintItem = item;
+		if (!this.getLevel().isClientSide) {
+			this.blueprint = SchematicManager.get().getSchematic(fingerprint);
+			this.finishPrint();
+		}
 		return true;
 	}
 
@@ -344,18 +354,21 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	}
 
 	public void finishPrint() {
+		final PrintableSchematic blueprint = this.blueprint;
+		this.blueprint = null;
 		this.printing = null;
 		this.pendingItems = null;
 		this.progress = 0;
 		this.setChanged();
 
-		if (this.blueprint == null) {
+		if (blueprint == null) {
+			Constants.LOG.warn("Trying to print without a blueprint");
 			return;
 		}
 
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
-		final Vec3i blueprintDimension = this.blueprint.getDimension();
+		final Vec3i blueprintDimension = blueprint.getDimension();
 		final float xRotate = (float) (this.printArgs.xRotate()) * 90f, yRotate = (float) (this.printArgs.yRotate()) * 90f;
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
 			.scale(this.printArgs.scale())
@@ -375,16 +388,25 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			this.printArgs.scale(),
 			levelId
 		);
+		ship.setSlug("+printed+" + blueprint.getFingerprint().substring(0, 8) + "+" + ship.getId());
 		final Vector3i shipCenter = ship.getChunkClaim().getCenterBlockCoordinates(VSGameUtilsKt.getYRange(level), new Vector3i());
 		final Vector3i shipOrigin = shipCenter.sub(blueprintDimension.getX() / 2, blueprintDimension.getY() / 2, blueprintDimension.getZ() / 2, new Vector3i());
-		this.blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
+		blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
 
 		final Vector3d absPosition = ship.getTransform().getPositionInWorld()
 			.add(ship.getInertiaData().getCenterOfMassInShip(), new Vector3d())
 			.sub(shipOrigin.x, shipOrigin.y, shipOrigin.z)
 			.add(worldOrigin.x - (int) (worldOrigin.x), worldOrigin.y - (int) (worldOrigin.y), worldOrigin.z - (int) (worldOrigin.z));
 		final Vector3d position = new Vector3d(absPosition);
-		final Quaterniond rotation = new Quaterniond().rotationX(xRotate * Mth.DEG_TO_RAD).rotateY(yRotate * Mth.DEG_TO_RAD);
+		final Quaterniond rotation = new Quaterniond();
+		if (xRotate != 0) {
+			rotation.rotationX(xRotate * Mth.DEG_TO_RAD);
+			if (yRotate != 0) {
+				rotation.rotateY(yRotate * Mth.DEG_TO_RAD);
+			}
+		} else if (yRotate != 0) {
+			rotation.rotationY(yRotate * Mth.DEG_TO_RAD);
+		}
 		final Vector3d velocity = new Vector3d();
 		final Vector3d omega = new Vector3d();
 		double scale = relativeScale;

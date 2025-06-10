@@ -72,6 +72,10 @@ public class QuantumFilmItem extends Item {
 	}
 
 	protected InteractionResult onSetPos(final ItemStack stack, final Level level, final Player player, final BlockPos pos) {
+		if (level.isClientSide) {
+			return InteractionResult.CONSUME_PARTIAL;
+		}
+
 		if (player.isShiftKeyDown()) {
 			clearBlockPos(stack);
 			player.displayClientMessage(
