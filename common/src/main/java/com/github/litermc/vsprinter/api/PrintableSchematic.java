@@ -218,9 +218,14 @@ public class PrintableSchematic {
 		this.stream().forEach((data) -> {
 			final BlockPos target = origin.offset(data.position());
 			level.setBlock(target, data.blockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+		});
+
+		this.stream().forEach((data) -> {
+			final BlockPos target = origin.offset(data.position());
 			if (level.getBlockEntity(target) instanceof ISchematicDataBlockEntity dataBlock) {
 				dataBlock.loadPrintableSchematicData(data.data());
 			}
+			level.blockUpdated(target, level.getBlockState(target).getBlock());
 		});
 	}
 }

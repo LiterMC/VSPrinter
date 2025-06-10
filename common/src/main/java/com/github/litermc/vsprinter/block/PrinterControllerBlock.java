@@ -1,12 +1,17 @@
 package com.github.litermc.vsprinter.block;
 
+import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.block.property.NullableDirection;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -52,5 +57,13 @@ public class PrinterControllerBlock extends Block implements EntityBlock {
 	@Override
 	public PrinterControllerBlockEntity newBlockEntity(final BlockPos pos, final BlockState state) {
 		return new PrinterControllerBlockEntity(pos, state);
+	}
+
+	@Override
+	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+		if (type != VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get()) {
+			return null;
+		}
+		return level.isClientSide ? null : (level2, pos, state2, entity) -> ((PrinterControllerBlockEntity) (entity)).serverTick();
 	}
 }
