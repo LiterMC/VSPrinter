@@ -25,6 +25,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.PushReaction;
 
 import java.util.function.BiFunction;
 
@@ -42,9 +43,21 @@ public final class VSPRegistry {
 		private static final RegistrationHelper<Block> REGISTRY = PlatformHelper.get().createRegistrationHelper(Registries.BLOCK);
 
 		public static final RegistryEntry<Block> PRINTER_CONTROLLER =
-			REGISTRY.register("printer_controller", () -> new PrinterControllerBlock(BlockBehaviour.Properties.of().strength(3f)));
+			REGISTRY.register("printer_controller", () -> new PrinterControllerBlock(
+				BlockBehaviour.Properties.of()
+					.strength(3f)
+					.requiresCorrectToolForDrops()));
 		public static final RegistryEntry<Block> PRINTER_FRAME =
-			REGISTRY.register("printer_frame", () -> new PrinterFrameBlock(BlockBehaviour.Properties.of().strength(4f)));
+			REGISTRY.register("printer_frame", () -> new PrinterFrameBlock(
+				BlockBehaviour.Properties.of()
+					.strength(4f)
+					.noOcclusion()
+					.dynamicShape()
+					.pushReaction(PushReaction.IGNORE)
+					.isRedstoneConductor((state, level, pos) -> false)
+					.requiresCorrectToolForDrops()
+			)
+		);
 
 		private Blocks() {}
 	}

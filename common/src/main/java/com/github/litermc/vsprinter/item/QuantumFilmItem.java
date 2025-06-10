@@ -2,6 +2,7 @@ package com.github.litermc.vsprinter.item;
 
 import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
+import com.github.litermc.vsprinter.block.PrinterControllerBlockEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -24,7 +25,7 @@ public class QuantumFilmItem extends Item {
 	private static final int MAX_BLOCK_LIMIT = 64 * 64 * 64;
 	private static final String FIRST_POS_TAG = "FirstPos";
 	private static final String SECOND_POS_TAG = "SecondPos";
-	private static final String BLUEPRINT_TAG = "Blueprint";
+	public static final String BLUEPRINT_TAG = "Blueprint";
 
 	public QuantumFilmItem(final Item.Properties props) {
 		super(props);
@@ -36,13 +37,29 @@ public class QuantumFilmItem extends Item {
 		if (player == null) {
 			return InteractionResult.PASS;
 		}
+		final Level level = ctx.getLevel();
+		final ItemStack stack = ctx.getItemInHand();
+		if (stack.isEmpty()) {
+			return InteractionResult.PASS;
+		}
 
 		BlockPos assigningPos = ctx.getClickedPos();
+
+		if (player.isShiftKeyDown()) {
+			if (level.getBlockEntity(assigningPos) instanceof PrinterControllerBlockEntity printer) {
+				if (getBlueprint(stack) != null && printer.putBlueprintItem(stack.copy())) {
+					stack.shrink(1);
+					return InteractionResult.SUCCESS;
+				}
+				return InteractionResult.FAIL;
+			}
+		}
+
 		if (ctx.getClickedFace().getStepY() != 0) {
 			assigningPos = assigningPos.relative(ctx.getClickedFace());
 		}
 
-		return onSetPos(ctx.getItemInHand(), player.level(), player, assigningPos);
+		return onSetPos(stack, level, player, assigningPos);
 	}
 
 	@Override
@@ -89,10 +106,6 @@ public class QuantumFilmItem extends Item {
 			return InteractionResult.SUCCESS;
 		}
 		clearBlockPos(stack);
-		player.displayClientMessage(
-			Component.literal("Area saved"),
-			true
-		);
 		final PrintableSchematic schematic = PrintableSchematic.fromLevel(level, new AABBi(
 			Math.min(firstPos.getX(), secondPos.getX()),
 			Math.min(firstPos.getY(), secondPos.getY()),
@@ -101,8 +114,20 @@ public class QuantumFilmItem extends Item {
 			Math.max(firstPos.getY(), secondPos.getY()),
 			Math.max(firstPos.getZ(), secondPos.getZ())
 		));
+		if (schematic == null) {
+			stack.removeTagKey(BLUEPRINT_TAG);
+			player.displayClientMessage(
+				Component.literal("Blueprint cleared"),
+				true
+			);
+			return InteractionResult.SUCCESS;
+		}
 		SchematicManager.get().putSchematic(schematic);
 		stack.getOrCreateTag().putString(BLUEPRINT_TAG, schematic.getFingerprint());
+		player.displayClientMessage(
+			Component.literal("Area saved"),
+			true
+		);
 		return InteractionResult.SUCCESS;
 	}
 

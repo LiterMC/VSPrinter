@@ -67,6 +67,10 @@ public class BlockPosBitSet extends BitSet implements Iterable<BlockPos> {
 		this.flip(this.getIndex(pos.getX(), pos.getY(), pos.getZ()));
 	}
 
+	public boolean get(final int x, final int y, final int z) {
+		return this.get(this.getIndex(x, y, z));
+	}
+
 	public boolean get(final BlockPos pos) {
 		return this.get(this.getIndex(pos.getX(), pos.getY(), pos.getZ()));
 	}

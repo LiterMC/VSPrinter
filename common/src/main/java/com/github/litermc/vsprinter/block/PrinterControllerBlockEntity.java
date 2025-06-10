@@ -53,6 +53,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
 	private PrintArguments printArgs = PrintArguments.DEFAULT;
+	private ItemStack blueprintItem = ItemStack.EMPTY;
 	private PrintableSchematic blueprint = null;
 	private Iterator<PrintableSchematic.BlockData> printing = null;
 	private Queue<ItemStack> pendingItems = null;
@@ -69,6 +70,24 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	public void setPrintArgs(final PrintArguments args) {
 		this.printArgs = args.validated();
 		this.setChanged();
+	}
+
+	public ItemStack getBlueprintItem() {
+		return this.blueprintItem;
+	}
+
+	public ItemStack takeBlueprintItem() {
+		final ItemStack item = this.blueprintItem;
+		this.blueprintItem = ItemStack.EMPTY;
+		return item;
+	}
+
+	public boolean putBlueprintItem(final ItemStack item) {
+		if (!this.blueprintItem.isEmpty()) {
+			return false;
+		}
+		this.blueprintItem = item;
+		return true;
 	}
 
 	void invalidate() {
@@ -167,6 +186,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		} else {
 			this.setPrintArgs(PrintArguments.DEFAULT);
 		}
+		this.blueprintItem = ItemStack.of(data.getCompound("BlueprintItem"));
 		if (data.contains("Blueprint")) {
 			this.blueprint = SchematicManager.get().getSchematic(data.getString("Blueprint"));
 			if (this.blueprint != null) {
@@ -201,6 +221,9 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		}
 		data.put("NbtItems", nbtItems);
 		data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
+		if (this.blueprintItem != null) {
+			data.put("BlueprintItem", this.blueprintItem.save(new CompoundTag()));
+		}
 		if (this.blueprint != null) {
 			data.putString("Blueprint", this.blueprint.getFingerprint());
 			data.putInt("Progress", this.progress);

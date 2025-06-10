@@ -111,8 +111,8 @@ public class PrintableSchematic {
 
 	public static PrintableSchematic fromLevel(final Level level, final AABBic area, final BiPredicate<Level, BlockPos> validator) {
 		final BlockPos min = new BlockPos(area.minX(), area.minY(), area.minZ());
-		final BlockPos dimension = new BlockPos(area.maxX() + 1, area.maxY() + 1, area.maxZ() + 1).subtract(min);
-		final BlockPosBitSet posList = new BlockPosBitSet(dimension);
+		final Vec3i dimension = new Vec3i(area.maxX() + 1, area.maxY() + 1, area.maxZ() + 1).subtract(min);
+		BlockPosBitSet posList = new BlockPosBitSet(dimension);
 		final ArrayList<BlockState> blocks = new ArrayList<>();
 		final ArrayList<CompoundTag> datas = new ArrayList<>();
 		final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -132,8 +132,95 @@ public class PrintableSchematic {
 				}
 			}
 		}
+		if (blocks.isEmpty()) {
+			return null;
+		}
 		blocks.trimToSize();
 		datas.trimToSize();
+		int lowY = 0, highY = dimension.getY() - 1;
+	LOW_Y_LOOP:
+		for (; lowY < highY; lowY++) {
+			for (int z = 0; z < dimension.getZ(); z++) {
+				for (int x = 0; x < dimension.getX(); x++) {
+					if (posList.get(x, lowY, z)) {
+						break LOW_Y_LOOP;
+					}
+				}
+			}
+		}
+	HIGH_Y_LOOP:
+		for (; highY > lowY ; highY--) {
+			for (int z = 0; z < dimension.getZ(); z++) {
+				for (int x = 0; x < dimension.getX(); x++) {
+					if (posList.get(x, highY, z)) {
+						highY++;
+						break HIGH_Y_LOOP;
+					}
+				}
+			}
+		}
+		int lowX = 0, highX = dimension.getX() - 1;
+	LOW_X_LOOP:
+		for (; lowX < highX; lowX++) {
+			for (int y = lowY; y < highY; y++) {
+				for (int z = 0; z < dimension.getZ(); z++) {
+					if (posList.get(lowX, y, z)) {
+						break LOW_X_LOOP;
+					}
+				}
+			}
+		}
+	HIGH_X_LOOP:
+		for (; highX > lowX ; highX--) {
+			for (int y = lowY; y < highY; y++) {
+				for (int z = 0; z < dimension.getZ(); z++) {
+					if (posList.get(highX, y, z)) {
+						highX++;
+						break HIGH_X_LOOP;
+					}
+				}
+			}
+		}
+		int lowZ = 0, highZ = dimension.getX() - 1;
+	LOW_Z_LOOP:
+		for (; lowZ < highZ; lowZ++) {
+			for (int x = lowX; x < highX; x++) {
+				for (int y = lowY; y < highY; y++) {
+					if (posList.get(x, y, lowZ)) {
+						break LOW_Z_LOOP;
+					}
+				}
+			}
+		}
+	HIGH_Z_LOOP:
+		for (; highZ > lowZ ; highZ--) {
+			for (int x = lowX; x < highX; x++) {
+				for (int y = lowY; y < highY; y++) {
+					if (posList.get(x, y, highZ)) {
+						highZ++;
+						break HIGH_Z_LOOP;
+					}
+				}
+			}
+		}
+		final int lowXF = lowX, lowYF = lowY, lowZF = lowZ;
+		final Vec3i dimensionTrimed = new Vec3i(highX - lowXF, highY - lowYF, highZ - lowZF);
+		if (!dimensionTrimed.equals(dimension)) {
+			final BlockPosBitSet posList2 = new BlockPosBitSet(dimensionTrimed);
+			posList.forEach((pos) -> {
+				final int newX = pos.getX() - lowXF;
+				final int newY = pos.getY() - lowYF;
+				final int newZ = pos.getZ() - lowZF;
+				if (
+					newX < 0 || newY < 0 || newZ < 0 ||
+					newX >= dimensionTrimed.getX() || newY >= dimensionTrimed.getY() || newZ >= dimensionTrimed.getZ()
+				) {
+					return;
+				}
+				posList2.set(newX, newY, newZ);
+			});
+			posList = posList2;
+		}
 		return new PrintableSchematic(posList, blocks, datas);
 	}
 
