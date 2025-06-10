@@ -51,7 +51,7 @@ import java.util.Queue;
 public class PrinterControllerBlockEntity extends BlockEntity {
 	private static final int MAX_RESOURCE_AMOUNT = 1024;
 
-	private AABB frameCache = null;
+	private volatile AABB frameCache = null;
 	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
 	private PrintArguments printArgs = PrintArguments.DEFAULT;
@@ -92,7 +92,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		if (fingerprint == null) {
 			return false;
 		}
-		this.blueprintItem = item;
+		// this.blueprintItem = item;
 		if (!this.getLevel().isClientSide) {
 			this.blueprint = SchematicManager.get().getSchematic(fingerprint);
 			this.finishPrint();
@@ -319,6 +319,11 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	 */
 	public String startPrint(final PrintableSchematic blueprint) {
 		final ServerLevel level = (ServerLevel) (this.getLevel());
+		final AABB frame = this.getFrameSpace();
+		if (frame == null) {
+			return "FRAME_NOT_FOUND";
+		}
+
 		double scale = this.printArgs.scale();
 		final Vector3d scaling = new Vector3d(scale);
 
@@ -340,7 +345,6 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
 			.scale(this.printArgs.scale())
 			.directionFromRotation((float) (this.printArgs.xRotate()) * 90f, (float) (this.printArgs.yRotate()) * 90f);
-		final AABB frame = this.getFrameSpace();
 		if (frame.getXsize() < Math.abs(dimension.x) || frame.getYsize() < Math.abs(dimension.y) || frame.getZsize() < Math.abs(dimension.z)) {
 			return "SPACE_TOO_SMALL";
 		}
@@ -368,12 +372,17 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
+		if (frame == null) {
+			Constants.LOG.warn("Trying to print without a frame");
+			return;
+		}
 		final Vec3i blueprintDimension = blueprint.getDimension();
 		final float xRotate = (float) (this.printArgs.xRotate()) * 90f, yRotate = (float) (this.printArgs.yRotate()) * 90f;
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
 			.scale(this.printArgs.scale())
-			.directionFromRotation(xRotate, yRotate);
-		final Vec3 worldOrigin = new Vec3(
+			.xRot(xRotate * Mth.DEG_TO_RAD)
+			.yRot(yRotate * Mth.DEG_TO_RAD);
+		final Vector3d worldOrigin = new Vector3d(
 			this.printArgs.xAlign().align(frame.minX, frame.maxX, dimension.x),
 			this.printArgs.yAlign().align(frame.minY, frame.maxY, dimension.y),
 			this.printArgs.zAlign().align(frame.minZ, frame.maxZ, dimension.z)
@@ -393,10 +402,14 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		final Vector3i shipOrigin = shipCenter.sub(blueprintDimension.getX() / 2, blueprintDimension.getY() / 2, blueprintDimension.getZ() / 2, new Vector3i());
 		blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
 
-		final Vector3d absPosition = ship.getTransform().getPositionInWorld()
-			.add(ship.getInertiaData().getCenterOfMassInShip(), new Vector3d())
-			.sub(shipOrigin.x, shipOrigin.y, shipOrigin.z)
-			.add(worldOrigin.x - (int) (worldOrigin.x), worldOrigin.y - (int) (worldOrigin.y), worldOrigin.z - (int) (worldOrigin.z));
+		// TODO: this may not work correct on scaled ship
+		final Vector3d absPosition = worldOrigin
+			.add(
+				ship.getInertiaData().getCenterOfMassInShip()
+					.sub(shipOrigin.x - 0.5, shipOrigin.y - 0.5, shipOrigin.z - 0.5, new Vector3d())
+					.mul(this.printArgs.scale()),
+				new Vector3d()
+			);
 		final Vector3d position = new Vector3d(absPosition);
 		final Quaterniond rotation = new Quaterniond();
 		if (xRotate != 0) {

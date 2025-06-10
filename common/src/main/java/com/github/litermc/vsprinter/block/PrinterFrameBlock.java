@@ -171,6 +171,7 @@ public class PrinterFrameBlock extends Block {
 				self = self.setValue(CONTROLLER, NullableDirection.NULL);
 			}
 		} else if (isFrame && (selfController == null || controllerChanged) && neighbor.getValue(CONTROLLER) != NullableDirection.NULL) {
+			invalidateController(level, neighborPos);
 			self = self.setValue(CONTROLLER, NullableDirection.fromDirection(face));
 		} else if (controllerChanged) {
 			self = self

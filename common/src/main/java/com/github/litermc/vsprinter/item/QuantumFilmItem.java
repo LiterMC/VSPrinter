@@ -51,7 +51,7 @@ public class QuantumFilmItem extends Item {
 			if (level.getBlockEntity(assigningPos) instanceof PrinterControllerBlockEntity printer) {
 				if (getBlueprint(stack) != null && printer.putBlueprintItem(stack.copy())) {
 					stack.shrink(1);
-					return InteractionResult.SUCCESS;
+					return level.isClientSide ? InteractionResult.CONSUME : InteractionResult.SUCCESS;
 				}
 				return InteractionResult.FAIL;
 			}
@@ -73,7 +73,7 @@ public class QuantumFilmItem extends Item {
 
 	protected InteractionResult onSetPos(final ItemStack stack, final Level level, final Player player, final BlockPos pos) {
 		if (level.isClientSide) {
-			return InteractionResult.CONSUME_PARTIAL;
+			return InteractionResult.CONSUME;
 		}
 
 		if (player.isShiftKeyDown()) {
