@@ -3,6 +3,7 @@ package com.github.litermc.vsprinter.block;
 import com.github.litermc.vsprinter.Constants;
 import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.api.PrintArguments;
+import com.github.litermc.vsprinter.api.PrintStatus;
 import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
 import com.github.litermc.vsprinter.item.QuantumFilmItem;
@@ -16,6 +17,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -55,6 +57,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
 	private PrintArguments printArgs = PrintArguments.DEFAULT;
+	protected PrintStatus status = PrintStatus.UNCONSTRUCTED;
 	private ItemStack blueprintItem = ItemStack.EMPTY;
 	private PrintableSchematic blueprint = null;
 	private Iterator<PrintableSchematic.BlockData> printing = null;
@@ -71,6 +74,18 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 
 	public void setPrintArgs(final PrintArguments args) {
 		this.printArgs = args.validated();
+		this.setChanged();
+	}
+
+	public PrintStatus getStatus() {
+		return this.status;
+	}
+
+	void setStatus(final PrintStatus status) {
+		if (this.status == status) {
+			return;
+		}
+		this.status = status;
 		this.setChanged();
 	}
 
@@ -92,10 +107,9 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		if (fingerprint == null) {
 			return false;
 		}
-		// this.blueprintItem = item;
+		this.blueprintItem = item;
 		if (!this.getLevel().isClientSide) {
 			this.blueprint = SchematicManager.get().getSchematic(fingerprint);
-			this.finishPrint();
 		}
 		return true;
 	}
@@ -196,6 +210,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		} else {
 			this.setPrintArgs(PrintArguments.DEFAULT);
 		}
+		this.status = PrintStatus.values()[data.getByte("Status")];
 		this.blueprintItem = ItemStack.of(data.getCompound("BlueprintItem"));
 		if (data.contains("Blueprint")) {
 			this.blueprint = SchematicManager.get().getSchematic(data.getString("Blueprint"));
@@ -230,7 +245,12 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			}
 		}
 		data.put("NbtItems", nbtItems);
+		this.saveAdditionalShared(data);
+	}
+
+	protected void saveAdditionalShared(final CompoundTag data) {
 		data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
+		data.putByte("Status", (byte) (this.status.ordinal()));
 		if (this.blueprintItem != null) {
 			data.put("BlueprintItem", this.blueprintItem.save(new CompoundTag()));
 		}
@@ -249,6 +269,18 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			}
 			data.put("PendingItems", pendingItems);
 		}
+	}
+
+	@Override
+	public CompoundTag getUpdateTag() {
+		CompoundTag data = super.getUpdateTag();
+		this.saveAdditionalShared(data);
+		return data;
+	}
+
+	@Override
+	public ClientboundBlockEntityDataPacket getUpdatePacket() {
+		return ClientboundBlockEntityDataPacket.create(this);
 	}
 
 	public AABB getFrameSpace() {
@@ -303,25 +335,27 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 				return;
 			}
 			this.pendingItems.remove();
+			this.setStatus(PrintStatus.WORKING);
 		}
 	}
 
 	protected void onRequireItem(final ItemStack item, final int amount) {
 		// TODO: send notification to client
-		this.setChanged();
+		this.setStatus(PrintStatus.REQUIRE_MATERIAL);
 	}
 
 	/**
 	 * Start printing model
 	 *
 	 * @param arg The print argument
-	 * @return start print error string, or {@code null} if action succeed
 	 */
-	public String startPrint(final PrintableSchematic blueprint) {
+	public void startPrint(final PrintableSchematic blueprint) {
+		this.status = PrintStatus.IDLE;
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
 		if (frame == null) {
-			return "FRAME_NOT_FOUND";
+			this.setStatus(PrintStatus.UNCONSTRUCTED);
+			return;
 		}
 
 		double scale = this.printArgs.scale();
@@ -335,10 +369,12 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		}
 
 		if (scale < 0.1) {
-			return "SCALE_TOO_SMALL";
+			this.setStatus(PrintStatus.SCALE_TOO_SMALL);
+			return;
 		}
 		if (scale > 10) {
-			return "SCALE_TOO_LARGE";
+			this.setStatus(PrintStatus.SCALE_TOO_LARGE);
+			return;
 		}
 
 		final Vec3i blueprintDimension = blueprint.getDimension();
@@ -346,7 +382,8 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			.scale(this.printArgs.scale())
 			.directionFromRotation((float) (this.printArgs.xRotate()) * 90f, (float) (this.printArgs.yRotate()) * 90f);
 		if (frame.getXsize() < Math.abs(dimension.x) || frame.getYsize() < Math.abs(dimension.y) || frame.getZsize() < Math.abs(dimension.z)) {
-			return "SPACE_TOO_SMALL";
+			this.setStatus(PrintStatus.NOT_ENOUGH_SPACE);
+			return;
 		}
 
 		this.blueprint = blueprint;
@@ -354,7 +391,6 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		this.pendingItems = null;
 		this.progress = 0;
 		this.setChanged();
-		return null;
 	}
 
 	public void finishPrint() {
@@ -466,6 +502,6 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	}
 
 	protected void onFinishPrint(final ServerShip ship) {
-		//
+		this.setStatus(PrintStatus.IDLE);
 	}
 }

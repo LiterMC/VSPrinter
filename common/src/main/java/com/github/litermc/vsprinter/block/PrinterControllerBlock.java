@@ -1,6 +1,7 @@
 package com.github.litermc.vsprinter.block;
 
 import com.github.litermc.vsprinter.VSPRegistry;
+import com.github.litermc.vsprinter.api.PrintStatus;
 import com.github.litermc.vsprinter.block.property.NullableDirection;
 
 import net.minecraft.core.BlockPos;
@@ -50,6 +51,9 @@ public class PrinterControllerBlock extends Block implements EntityBlock {
 		}
 		if (shouldInvalidate && level.getBlockEntity(selfPos) instanceof PrinterControllerBlockEntity be) {
 			be.invalidate();
+			if (frameDir == face) {
+				be.setStatus(isFrame ? PrintStatus.IDLE : PrintStatus.UNCONSTRUCTED);
+			}
 		}
 		return self;
 	}
