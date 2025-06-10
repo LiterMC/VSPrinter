@@ -16,6 +16,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -284,6 +285,33 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	 * @return start print error string, or {@code null} if action succeed
 	 */
 	public String startPrint(final PrintableSchematic blueprint) {
+		final ServerLevel level = (ServerLevel) (this.getLevel());
+		double scale = this.printArgs.scale();
+		final Vector3d scaling = new Vector3d(scale);
+
+		final ServerShip selfShip = VSGameUtilsKt.getShipManagingPos(level, this.getBlockPos());
+		if (selfShip != null) {
+			final ShipTransform selfTransform = selfShip.getTransform();
+			scaling.mul(selfTransform.getShipToWorldScaling());
+			scale = Math.sqrt(scaling.lengthSquared() / 3);
+		}
+
+		if (scale < 0.1) {
+			return "SCALE_TOO_SMALL";
+		}
+		if (scale > 10) {
+			return "SCALE_TOO_LARGE";
+		}
+
+		final Vec3i blueprintDimension = blueprint.getDimension();
+		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
+			.scale(this.printArgs.scale())
+			.directionFromRotation((float) (this.printArgs.xRotate()) * 90f, (float) (this.printArgs.yRotate()) * 90f);
+		final AABB frame = this.getFrameSpace();
+		if (frame.getXsize() < Math.abs(dimension.x) || frame.getYsize() < Math.abs(dimension.y) || frame.getZsize() < Math.abs(dimension.z)) {
+			return "SPACE_TOO_SMALL";
+		}
+
 		this.blueprint = blueprint;
 		this.printing = this.blueprint.stream().iterator();
 		this.pendingItems = null;
@@ -305,9 +333,10 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
 		final Vec3i blueprintDimension = this.blueprint.getDimension();
+		final float xRotate = (float) (this.printArgs.xRotate()) * 90f, yRotate = (float) (this.printArgs.yRotate()) * 90f;
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
 			.scale(this.printArgs.scale())
-			.directionFromRotation((float) (this.printArgs.xRotate()) * 90f, (float) (this.printArgs.yRotate()) * 90f);
+			.directionFromRotation(xRotate, yRotate);
 		final Vec3 worldOrigin = new Vec3(
 			this.printArgs.xAlign().align(frame.minX, frame.maxX, dimension.x),
 			this.printArgs.yAlign().align(frame.minY, frame.maxY, dimension.y),
@@ -332,7 +361,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			.sub(shipOrigin.x, shipOrigin.y, shipOrigin.z)
 			.add(worldOrigin.x - (int) (worldOrigin.x), worldOrigin.y - (int) (worldOrigin.y), worldOrigin.z - (int) (worldOrigin.z));
 		final Vector3d position = new Vector3d(absPosition);
-		final Quaterniond rotation = new Quaterniond();
+		final Quaterniond rotation = new Quaterniond().rotationX(xRotate * Mth.DEG_TO_RAD).rotateY(yRotate * Mth.DEG_TO_RAD);
 		final Vector3d velocity = new Vector3d();
 		final Vector3d omega = new Vector3d();
 		double scale = relativeScale;
@@ -346,7 +375,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			velocity.set(selfShip.getVelocity());
 			omega.set(selfShip.getOmega());
 			scaling.mul(selfTransform.getShipToWorldScaling());
-			scale *= Math.sqrt(scaling.lengthSquared() / 3);
+			scale = Math.sqrt(scaling.lengthSquared() / 3);
 		}
 		shipWorld.teleportShip(ship, new ShipTeleportDataImpl(position, rotation, velocity, omega, levelId, scale));
 

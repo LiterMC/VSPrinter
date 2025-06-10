@@ -30,7 +30,9 @@ public record PrintArguments(
 		float scale = this.scale;
 		if (scale < 0.1f) {
 			scale = 0.1f;
-		} else if (!(scale < 1.0f)) { // handle NaN case as well
+		} else if (scale > 1.5f) {
+			scale = 1.5f;
+		} else if (Float.isNaN(scale)) {
 			scale = 1.0f;
 		}
 		return new PrintArguments(

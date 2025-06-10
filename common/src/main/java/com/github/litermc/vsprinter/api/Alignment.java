@@ -18,6 +18,13 @@ public enum Alignment {
 		if (max < min) {
 			throw new IllegalArgumentException("max is less than min");
 		}
+		if (width < 0) {
+			return switch (this) {
+			case NEGATIVE -> min + width;
+			case CENTER -> (min + max - width) / 2;
+			case POSITIVE -> max;
+			};
+		}
 		return switch (this) {
 		case NEGATIVE -> min;
 		case CENTER -> (min + max - width) / 2;
