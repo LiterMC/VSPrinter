@@ -104,6 +104,7 @@ public final class VSPRegistry {
 			.displayItems((context, out) -> {
 				out.accept(Items.PRINTER_CONTROLLER.get());
 				out.accept(Items.PRINTER_FRAME.get());
+				out.accept(Items.QUANTUM_FILM.get());
 			})
 			.build());
 	}

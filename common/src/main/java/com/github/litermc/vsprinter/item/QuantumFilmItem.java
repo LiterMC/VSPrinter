@@ -4,6 +4,7 @@ import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
 import com.github.litermc.vsprinter.block.PrinterControllerBlockEntity;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -26,6 +27,7 @@ public class QuantumFilmItem extends Item {
 	private static final String FIRST_POS_TAG = "FirstPos";
 	private static final String SECOND_POS_TAG = "SecondPos";
 	public static final String BLUEPRINT_TAG = "Blueprint";
+	private static final String DIMENSION_TAG = "Dimension";
 
 	public QuantumFilmItem(final Item.Properties props) {
 		super(props);
@@ -124,6 +126,10 @@ public class QuantumFilmItem extends Item {
 		}
 		SchematicManager.get().putSchematic(schematic);
 		stack.getOrCreateTag().putString(BLUEPRINT_TAG, schematic.getFingerprint());
+		final CompoundTag dimTag = stack.getOrCreateTagElement(DIMENSION_TAG);
+		dimTag.putInt("x", schematic.getDimension().getX());
+		dimTag.putInt("y", schematic.getDimension().getY());
+		dimTag.putInt("z", schematic.getDimension().getZ());
 		player.displayClientMessage(
 			Component.literal("Area saved"),
 			true
@@ -136,7 +142,22 @@ public class QuantumFilmItem extends Item {
 		super.appendHoverText(stack, level, texts, flags);
 		final String blueprint = getBlueprint(stack);
 		if (blueprint != null) {
-			texts.add(Component.literal("Blueprint: ").append(blueprint.substring(0, 16)));
+			texts.add(
+				Component.literal("Blueprint: ")
+					.withStyle(ChatFormatting.GRAY)
+					.append(Component.literal(blueprint.substring(0, 16)).withStyle(ChatFormatting.AQUA, ChatFormatting.UNDERLINE))
+			);
+			final CompoundTag dimension = stack.getTagElement(DIMENSION_TAG);
+			if (dimension != null) {
+				final int xSize = dimension.getInt("x");
+				final int ySize = dimension.getInt("y");
+				final int zSize = dimension.getInt("z");
+				texts.add(
+					Component.literal("Dimension: ")
+						.withStyle(ChatFormatting.GRAY)
+						.append(String.format("%d*%d*%d", xSize, ySize, zSize))
+				);
+			}
 		}
 	}
 

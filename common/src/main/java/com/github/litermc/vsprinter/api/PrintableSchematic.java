@@ -153,12 +153,12 @@ public class PrintableSchematic {
 			for (int z = 0; z < dimension.getZ(); z++) {
 				for (int x = 0; x < dimension.getX(); x++) {
 					if (posList.get(x, highY, z)) {
-						highY++;
 						break HIGH_Y_LOOP;
 					}
 				}
 			}
 		}
+		highY++;
 		int lowX = 0, highX = dimension.getX() - 1;
 	LOW_X_LOOP:
 		for (; lowX < highX; lowX++) {
@@ -175,13 +175,13 @@ public class PrintableSchematic {
 			for (int y = lowY; y < highY; y++) {
 				for (int z = 0; z < dimension.getZ(); z++) {
 					if (posList.get(highX, y, z)) {
-						highX++;
 						break HIGH_X_LOOP;
 					}
 				}
 			}
 		}
-		int lowZ = 0, highZ = dimension.getX() - 1;
+		highX++;
+		int lowZ = 0, highZ = dimension.getZ() - 1;
 	LOW_Z_LOOP:
 		for (; lowZ < highZ; lowZ++) {
 			for (int x = lowX; x < highX; x++) {
@@ -197,12 +197,12 @@ public class PrintableSchematic {
 			for (int x = lowX; x < highX; x++) {
 				for (int y = lowY; y < highY; y++) {
 					if (posList.get(x, y, highZ)) {
-						highZ++;
 						break HIGH_Z_LOOP;
 					}
 				}
 			}
 		}
+		highZ++;
 		final int lowXF = lowX, lowYF = lowY, lowZF = lowZ;
 		final Vec3i dimensionTrimed = new Vec3i(highX - lowXF, highY - lowYF, highZ - lowZF);
 		if (!dimensionTrimed.equals(dimension)) {
