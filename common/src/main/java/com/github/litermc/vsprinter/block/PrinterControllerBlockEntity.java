@@ -3,10 +3,12 @@ package com.github.litermc.vsprinter.block;
 import com.github.litermc.vsprinter.Constants;
 import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.api.PrintArguments;
+import com.github.litermc.vsprinter.api.PrintPlugin;
 import com.github.litermc.vsprinter.api.PrintStatus;
 import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
 import com.github.litermc.vsprinter.item.QuantumFilmItem;
+import com.github.litermc.vsprinter.ship.ShipPrintedInfoPlugin;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -53,19 +55,26 @@ import java.util.Queue;
 public class PrinterControllerBlockEntity extends BlockEntity {
 	private static final int MAX_RESOURCE_AMOUNT = 1024;
 
-	private volatile AABB frameCache = null;
+	private final List<PrintPlugin> plugins = new ArrayList<>();
+
 	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
+
 	private PrintArguments printArgs = PrintArguments.DEFAULT;
 	protected PrintStatus status = PrintStatus.UNCONSTRUCTED;
+
 	private ItemStack blueprintItem = ItemStack.EMPTY;
 	private PrintableSchematic blueprint = null;
 	private Iterator<PrintableSchematic.BlockData> printing = null;
 	private Queue<ItemStack> pendingItems = null;
 	private int progress = 0;
 
+	private AABB frameCache = null;
+
 	public PrinterControllerBlockEntity(final BlockPos pos, final BlockState state) {
 		super(VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get(), pos, state);
+
+		this.plugins.add(ShipPrintedInfoPlugin.INSTANCE);
 	}
 
 	public PrintArguments getPrintArgs() {
@@ -107,9 +116,10 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		if (fingerprint == null) {
 			return false;
 		}
-		this.blueprintItem = item;
+		// this.blueprintItem = item;
 		if (!this.getLevel().isClientSide) {
 			this.blueprint = SchematicManager.get().getSchematic(fingerprint);
+			this.finishPrint();
 		}
 		return true;
 	}
@@ -257,17 +267,19 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		if (this.blueprint != null) {
 			data.putString("Blueprint", this.blueprint.getFingerprint());
 			data.putInt("Progress", this.progress);
-			final ListTag pendingItems = new ListTag();
-			while (true) {
-				final ItemStack stack = this.pendingItems.poll();
-				if (stack == null) {
-					break;
+			if (this.pendingItems != null) {
+				final ListTag pendingItems = new ListTag();
+				while (true) {
+					final ItemStack stack = this.pendingItems.poll();
+					if (stack == null) {
+						break;
+					}
+					if (!stack.isEmpty()) {
+						pendingItems.add(stack.save(new CompoundTag()));
+					}
 				}
-				if (!stack.isEmpty()) {
-					pendingItems.add(stack.save(new CompoundTag()));
-				}
+				data.put("PendingItems", pendingItems);
 			}
-			data.put("PendingItems", pendingItems);
 		}
 	}
 
@@ -315,7 +327,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			return;
 		}
 		if (this.pendingItems == null || this.pendingItems.isEmpty()) {
-			if (!this.printing.hasNext()) {
+			if (this.canFinishPrint()) {
 				this.finishPrint();
 				return;
 			}
@@ -393,7 +405,11 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		this.setChanged();
 	}
 
-	public void finishPrint() {
+	public boolean canFinishPrint() {
+		return !this.printing.hasNext();
+	}
+
+	public ServerShip finishPrint() {
 		final PrintableSchematic blueprint = this.blueprint;
 		this.blueprint = null;
 		this.printing = null;
@@ -403,14 +419,14 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 
 		if (blueprint == null) {
 			Constants.LOG.warn("Trying to print without a blueprint");
-			return;
+			return null;
 		}
 
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
 		if (frame == null) {
 			Constants.LOG.warn("Trying to print without a frame");
-			return;
+			return null;
 		}
 		final Vec3i blueprintDimension = blueprint.getDimension();
 		final float xRotate = (float) (this.printArgs.xRotate()) * 90f, yRotate = (float) (this.printArgs.yRotate()) * 90f;
@@ -498,10 +514,11 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			});
 		}
 
-		this.onFinishPrint(ship);
-	}
+		for (final PrintPlugin plugin : this.plugins) {
+			plugin.onShipFinish(this, ship);
+		}
 
-	protected void onFinishPrint(final ServerShip ship) {
 		this.setStatus(PrintStatus.IDLE);
+		return ship;
 	}
 }

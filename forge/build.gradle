@@ -19,6 +19,10 @@ architectury {
 loom {
 	accessWidenerPath = project(":common").loom.accessWidenerPath
 
+	mixin {
+		defaultRefmapName.set("${mod_id}.refmap.json")
+	}
+
 	forge {
 		convertAccessWideners = true
 		mixinConfig "${mod_id}.mixins.json"
@@ -36,6 +40,8 @@ configurations {
 }
 
 dependencies {
+	api "org.jetbrains.kotlin:kotlin-reflect:1.9.10"
+	api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10"
 	forge "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
 	include modApi("dev.architectury:architectury-forge:${architectury_version}")
