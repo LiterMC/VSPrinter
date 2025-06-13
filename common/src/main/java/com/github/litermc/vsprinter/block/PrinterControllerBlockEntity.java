@@ -130,8 +130,8 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			return false;
 		}
 		this.blueprintItem = item;
-		if (!this.getLevel().isClientSide) {
-			this.blueprint = SchematicManager.get().getSchematic(fingerprint);
+		if (!this.getLevel().isClientSide) { // DEBUG
+			this.startPrint(SchematicManager.get().getSchematic(fingerprint));
 		}
 		this.setChanged();
 		return true;
@@ -144,6 +144,11 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		this.pendingItems = null;
 		this.progress = 0;
 		this.setChanged();
+	}
+
+	protected int getScaledCount(int count) {
+		final double scale = this.printArgs.scale();
+		return (int) (Math.ceil(count * (scale * scale * scale)));
 	}
 
 	/**
@@ -184,10 +189,11 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 	 * @return {@code 0} if consume succeed, or the amount of unit missing
 	 */
 	protected int tryConsumeUnit(final ItemStack stack) {
+		final int needs = this.getScaledCount(stack.getCount());
 		final CompoundTag tag = stack.getTag();
 		if (tag == null || tag.isEmpty()) {
 			final int count = this.items.getOrDefault(stack.getItem(), 0);
-			final int remain = count - stack.getCount();
+			final int remain = count - needs;
 			if (remain < 0) {
 				return -remain;
 			}
@@ -203,7 +209,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			if (stack.getItem() != s.getItem() || !tag.equals(s.getTag())) {
 				continue;
 			}
-			final int remain = s.getCount() - stack.getCount();
+			final int remain = s.getCount() - needs;
 			if (remain < 0) {
 				return -remain;
 			}
@@ -215,7 +221,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			}
 			return 0;
 		}
-		return stack.getCount();
+		return needs;
 	}
 
 	@Override
@@ -407,11 +413,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			data.putInt("Progress", this.progress);
 			if (this.pendingItems != null) {
 				final ListTag pendingItems = new ListTag();
-				while (true) {
-					final ItemStack stack = this.pendingItems.poll();
-					if (stack == null) {
-						break;
-					}
+				for (final ItemStack stack : this.pendingItems) {
 					if (!stack.isEmpty()) {
 						pendingItems.add(stack.save(new CompoundTag()));
 					}
@@ -464,12 +466,17 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		if (this.printing == null) {
 			return;
 		}
-		if (this.pendingItems == null || this.pendingItems.isEmpty()) {
+		if (this.pendingItems == null) {
 			if (this.canFinishPrint()) {
 				this.finishPrint();
 				return;
 			}
-			this.pendingItems = new ArrayDeque<>(this.printing.next().requiredItems());
+			final List<ItemStack> itemsList = this.printing.next().requiredItems();
+			if (itemsList == null) {
+				this.setStatus(PrintStatus.INVALID);
+				return;
+			}
+			this.pendingItems = new ArrayDeque<>(itemsList);
 		}
 		while (true) {
 			final ItemStack need = this.pendingItems.peek();
@@ -481,7 +488,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			}
 			final int require = this.tryConsumeUnit(need);
 			if (require > 0) {
-				this.onRequireItem(need, require);
+				this.onRequireItem(need.copyWithCount(require));
 				return;
 			}
 			this.pendingItems.remove();
@@ -489,7 +496,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		}
 	}
 
-	protected void onRequireItem(final ItemStack item, final int amount) {
+	protected void onRequireItem(final ItemStack stack) {
 		// TODO: send notification to client
 		this.setStatus(PrintStatus.REQUIRE_MATERIAL);
 	}
