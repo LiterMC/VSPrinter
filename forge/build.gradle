@@ -2,15 +2,7 @@ plugins {
 	id 'multiloader-loader'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'com.modrinth.minotaur' version '2.+'
-	// id 'net.neoforged.moddev.legacyforge'
 }
-
-// mixin {
-// 	add(sourceSets.main, "${mod_id}.refmap.json")
-
-// 	config("${mod_id}.mixins.json")
-// 	config("${mod_id}.forge.mixins.json")
-// }
 
 architectury {
 	forge()

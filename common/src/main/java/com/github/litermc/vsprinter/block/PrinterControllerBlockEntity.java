@@ -7,11 +7,13 @@ import com.github.litermc.vsprinter.api.PrintPlugin;
 import com.github.litermc.vsprinter.api.PrintStatus;
 import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
+import com.github.litermc.vsprinter.api.StackUtil;
 import com.github.litermc.vsprinter.item.QuantumFilmItem;
 import com.github.litermc.vsprinter.ship.ShipPrintedInfoPlugin;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntSortedMap;
+import it.unimi.dsi.fastutil.objects.Object2IntAVLTreeMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
@@ -23,6 +25,9 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -51,13 +56,17 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Queue;
+import java.util.Set;
 
-public class PrinterControllerBlockEntity extends BlockEntity {
+public class PrinterControllerBlockEntity extends BlockEntity implements Container {
+	private static final int MAX_RESOURCE_TYPE = 128;
 	private static final int MAX_RESOURCE_AMOUNT = 1024;
 
 	private final List<PrintPlugin> plugins = new ArrayList<>();
 
-	private final Object2IntMap<Item> items = new Object2IntOpenHashMap<>(8);
+	private final Object2IntSortedMap<Item> items = new Object2IntAVLTreeMap<>((a, b) -> {
+		return Integer.compare(Item.getId(a), Item.getId(b));
+	});
 	private final List<ItemStack> nbtItems = new ArrayList<>();
 
 	private PrintArguments printArgs = PrintArguments.DEFAULT;
@@ -105,6 +114,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	public ItemStack takeBlueprintItem() {
 		final ItemStack item = this.blueprintItem;
 		this.blueprintItem = ItemStack.EMPTY;
+		this.setChanged();
 		return item;
 	}
 
@@ -112,15 +122,18 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 		if (!this.blueprintItem.isEmpty()) {
 			return false;
 		}
+		if (item.getCount() != 1) {
+			return false;
+		}
 		final String fingerprint = QuantumFilmItem.getBlueprint(item);
 		if (fingerprint == null) {
 			return false;
 		}
-		// this.blueprintItem = item;
+		this.blueprintItem = item;
 		if (!this.getLevel().isClientSide) {
 			this.blueprint = SchematicManager.get().getSchematic(fingerprint);
-			this.finishPrint();
 		}
+		this.setChanged();
 		return true;
 	}
 
@@ -141,7 +154,15 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 	public boolean putItemUnit(final ItemStack stack) {
 		final CompoundTag tag = stack.getTag();
 		if (tag == null || tag.isEmpty()) {
-			this.items.computeInt(stack.getItem(), (i, v) -> (v == null ? 0 : v) + stack.getCount());
+			this.items.computeInt(stack.getItem(), (i, v) -> {
+				if (v == null) {
+					if (this.nbtItems.size() + this.items.size() >= MAX_RESOURCE_TYPE) {
+						return null;
+					}
+					return stack.getCount();
+				}
+				return v + stack.getCount();
+			});
 			return true;
 		}
 		for (final ItemStack s : this.nbtItems) {
@@ -150,7 +171,7 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 				return true;
 			}
 		}
-		if (this.nbtItems.size() < 64) {
+		if (this.nbtItems.size() + this.items.size() < MAX_RESOURCE_TYPE) {
 			this.nbtItems.add(stack);
 			return true;
 		}
@@ -170,7 +191,11 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			if (remain < 0) {
 				return -remain;
 			}
-			this.items.put(stack.getItem(), remain);
+			if (remain == 0) {
+				this.items.removeInt(stack.getItem());
+			} else {
+				this.items.put(stack.getItem(), remain);
+			}
 			return 0;
 		}
 		for (int i = 0; i < this.nbtItems.size(); i++) {
@@ -191,6 +216,119 @@ public class PrinterControllerBlockEntity extends BlockEntity {
 			return 0;
 		}
 		return stack.getCount();
+	}
+
+	@Override
+	public void clearContent() {
+		this.blueprintItem = ItemStack.EMPTY;
+		this.items.clear();
+		this.nbtItems.clear();
+	}
+
+	@Override
+	public int getContainerSize() {
+		return 2 + this.items.size() + this.nbtItems.size();
+	}
+
+	@Override
+	public boolean isEmpty() {
+		return this.blueprintItem.isEmpty() && this.items.isEmpty() && this.nbtItems.isEmpty();
+	}
+
+	@Override
+	public ItemStack getItem(int slot) {
+		if (slot == 0) {
+			return this.getBlueprintItem();
+		}
+		slot -= 2;
+		if (slot < 0) {
+			return ItemStack.EMPTY;
+		}
+		final int nbtItemsSize = this.nbtItems.size();
+		if (slot < nbtItemsSize) {
+			return this.nbtItems.get(slot);
+		}
+		slot -= nbtItemsSize;
+		return this.items.object2IntEntrySet().stream().skip(slot).findFirst().map((entry) -> new ItemStack(entry.getKey(), entry.getValue())).orElse(ItemStack.EMPTY);
+	}
+
+	@Override
+	public ItemStack removeItem(final int slot, final int count) {
+		if (slot == 0) {
+			return this.takeBlueprintItem();
+		}
+		return ItemStack.EMPTY;
+	}
+
+	@Override
+	public ItemStack removeItemNoUpdate(final int slot) {
+		if (slot == 0) {
+			final ItemStack item = this.blueprintItem;
+			this.blueprintItem = ItemStack.EMPTY;
+			return item;
+		}
+		return ItemStack.EMPTY;
+	}
+
+	@Override
+	public void setItem(final int slot, final ItemStack stack) {
+		switch (slot) {
+		case 0 -> this.putBlueprintItem(stack);
+		case 1 -> this.putItemUnit(StackUtil.convertStackToUnits(stack));
+		}
+	}
+
+	@Override
+	public int getMaxStackSize() {
+		return MAX_RESOURCE_AMOUNT;
+	}
+
+	@Override
+	public boolean stillValid(final Player player) {
+		return true;
+	}
+
+	@Override
+	public boolean canPlaceItem(final int slot, final ItemStack stack) {
+		if (slot == 0) {
+			return this.blueprintItem.isEmpty() && stack.is(VSPRegistry.Items.QUANTUM_FILM.get()) && stack.getCount() == 1;
+		}
+		return slot == 1;
+	}
+
+	@Override
+	public boolean canTakeItem(final Container other, final int slot, final ItemStack stack) {
+		return slot == 0;
+	}
+
+	@Override
+	public int countItem(final Item item) {
+		int count = 0;
+		if (this.getBlueprintItem().getItem() == item) {
+			count++;
+		}
+		count += this.items.getInt(item);
+		count += this.nbtItems.stream().map(ItemStack::getItem).filter(item::equals).count();
+		return count;
+	}
+
+	@Override
+	public boolean hasAnyOf(final Set<Item> items) {
+		final Item blueprintItem = this.getBlueprintItem().getItem();
+		for (final Item item : items) {
+			if (blueprintItem == item) {
+				return true;
+			}
+			if (this.items.getInt(item) > 0) {
+				return true;
+			}
+		}
+		for (final Item item : items) {
+			if (this.nbtItems.stream().map(ItemStack::getItem).anyMatch(item::equals)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override

@@ -30,4 +30,21 @@ public final class StackUtil {
 		}
 		return (double) (units) / UNIT;
 	}
+
+	public static ItemStack setUnitsToStack(final ItemStack stack) {
+		final Item item = stack.getItem();
+		if (item.canBeDepleted()) {
+			final int maxDamage = item.getMaxDamage();
+			final double count = stack.getCount() / maxDamage;
+			if (count < 1) {
+				stack.setCount(1);
+				stack.setDamageValue((int) (count * maxDamage));
+			} else {
+				stack.setCount((int) (count));
+			}
+		} else {
+			stack.setCount(stack.getCount() / UNIT);
+		}
+		return stack;
+	}
 }
