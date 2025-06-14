@@ -61,6 +61,8 @@ dependencies {
 	modRuntimeOnly "maven.modrinth:jade:${jade_version}+forge"
 	modCompileOnly "com.simibubi.create:create-${minecraft_version}:${create_forge_version}:all"
 	modRuntimeOnly "com.simibubi.create:create-${minecraft_version}:${create_forge_version}:all"
+
+	compileOnly "cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cc_tweaked}"
 }
 
 shadowJar {

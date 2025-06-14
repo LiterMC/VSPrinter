@@ -45,6 +45,7 @@ import org.joml.Vector3i;
 import org.joml.primitives.AABBi;
 import org.valkyrienskies.core.api.ships.ServerShip;
 import org.valkyrienskies.core.api.ships.ServerShipTransformProvider;
+import org.valkyrienskies.core.api.ships.Ship;
 import org.valkyrienskies.core.api.ships.properties.ShipTransform;
 import org.valkyrienskies.core.apigame.world.ServerShipWorldCore;
 import org.valkyrienskies.core.impl.game.ShipTeleportDataImpl;
@@ -147,7 +148,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 	}
 
 	protected int getScaledCount(int count) {
-		final double scale = this.printArgs.scale();
+		final double scale = this.printArgs.scale() * this.getPrinterScale();
 		return (int) (Math.ceil(count * (scale * scale * scale)));
 	}
 
@@ -435,6 +436,17 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		return ClientboundBlockEntityDataPacket.create(this);
 	}
 
+	/**
+	 * get the scale of the printer's ship, if its on one, or 1.0 if the printer is not on a ship.
+	 */
+	public double getPrinterScale() {
+		final Ship ship = VSGameUtilsKt.getShipManagingPos(this.getLevel(), this.getBlockPos());
+		if (ship == null) {
+			return 1;
+		}
+		return Math.sqrt(ship.getTransform().getShipToWorldScaling().lengthSquared() / 3);
+	}
+
 	public AABB getFrameSpace() {
 		if (this.frameCache != null) {
 			return this.frameCache;
@@ -515,15 +527,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			return;
 		}
 
-		double scale = this.printArgs.scale();
-		final Vector3d scaling = new Vector3d(scale);
-
-		final ServerShip selfShip = VSGameUtilsKt.getShipManagingPos(level, this.getBlockPos());
-		if (selfShip != null) {
-			final ShipTransform selfTransform = selfShip.getTransform();
-			scaling.mul(selfTransform.getShipToWorldScaling());
-			scale = Math.sqrt(scaling.lengthSquared() / 3);
-		}
+		final double scale = this.printArgs.scale() * this.getPrinterScale();
 
 		if (scale < 0.1) {
 			this.setStatus(PrintStatus.SCALE_TOO_SMALL);
@@ -573,10 +577,13 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			Constants.LOG.warn("Trying to print without a frame");
 			return null;
 		}
+		final double relativeScale = this.printArgs.scale();
+		final double scale = relativeScale * this.getPrinterScale();
+
 		final Vec3i blueprintDimension = blueprint.getDimension();
 		final float xRotate = (float) (this.printArgs.xRotate()) * 90f, yRotate = (float) (this.printArgs.yRotate()) * 90f;
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
-			.scale(this.printArgs.scale())
+			.scale(relativeScale)
 			.xRot(xRotate * Mth.DEG_TO_RAD)
 			.yRot(yRotate * Mth.DEG_TO_RAD);
 		final Vector3d worldOrigin = new Vector3d(
@@ -584,19 +591,19 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			this.printArgs.yAlign().align(frame.minY, frame.maxY, dimension.y),
 			this.printArgs.zAlign().align(frame.minZ, frame.maxZ, dimension.z)
 		);
-		final double relativeScale = this.printArgs.scale();
 
 		final ServerShipWorldCore shipWorld = VSGameUtilsKt.getShipObjectWorld(level);
 		final String levelId = VSGameUtilsKt.getDimensionId(level);
 		final ServerShip ship = shipWorld.createNewShipAtBlock(
 			new Vector3i((int) (worldOrigin.x), (int) (worldOrigin.y), (int) (worldOrigin.z)),
 			false,
-			this.printArgs.scale(),
+			scale,
 			levelId
 		);
 		ship.setSlug("+printed+" + blueprint.getFingerprint().substring(0, 8) + "+" + ship.getId());
 		final Vector3i shipCenter = ship.getChunkClaim().getCenterBlockCoordinates(VSGameUtilsKt.getYRange(level), new Vector3i());
 		final Vector3i shipOrigin = shipCenter.sub(blueprintDimension.getX() / 2, blueprintDimension.getY() / 2, blueprintDimension.getZ() / 2, new Vector3i());
+
 		blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
 
 		// TODO: this may not work correct on scaled ship
@@ -604,7 +611,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			.add(
 				ship.getInertiaData().getCenterOfMassInShip()
 					.sub(shipOrigin.x - 0.5, shipOrigin.y - 0.5, shipOrigin.z - 0.5, new Vector3d())
-					.mul(this.printArgs.scale()),
+					.mul(scale),
 				new Vector3d()
 			);
 		final Vector3d position = new Vector3d(absPosition);
@@ -619,8 +626,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		}
 		final Vector3d velocity = new Vector3d();
 		final Vector3d omega = new Vector3d();
-		double scale = relativeScale;
-		final Vector3d scaling = new Vector3d(scale);
+		final Vector3d scaling = new Vector3d(relativeScale);
 
 		final ServerShip selfShip = VSGameUtilsKt.getShipManagingPos(level, this.getBlockPos());
 		if (selfShip != null) {
@@ -630,7 +636,6 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			velocity.set(selfShip.getVelocity());
 			omega.set(selfShip.getOmega());
 			scaling.mul(selfTransform.getShipToWorldScaling());
-			scale = Math.sqrt(scaling.lengthSquared() / 3);
 		}
 		shipWorld.teleportShip(ship, new ShipTeleportDataImpl(position, rotation, velocity, omega, levelId, scale));
 

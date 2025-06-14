@@ -36,6 +36,8 @@ dependencies {
 	modRuntimeOnly "maven.modrinth:jade:${jade_version}+fabric"
 	modCompileOnly "com.simibubi.create:create-fabric-${minecraft_version}:${create_fabric_version}"
 	modRuntimeOnly "com.simibubi.create:create-fabric-${minecraft_version}:${create_fabric_version}"
+
+	compileOnly "cc.tweaked:cc-tweaked-${minecraft_version}-common:${cc_tweaked}"
 }
 
 loom {
