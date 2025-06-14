@@ -2,6 +2,7 @@ package com.github.litermc.vsprinter.block;
 
 import com.github.litermc.vsprinter.Constants;
 import com.github.litermc.vsprinter.VSPRegistry;
+import com.github.litermc.vsprinter.api.ISchematicDataBlockEntity;
 import com.github.litermc.vsprinter.api.PrintArguments;
 import com.github.litermc.vsprinter.api.PrintPlugin;
 import com.github.litermc.vsprinter.api.PrintStatus;
@@ -604,7 +605,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		final Vector3i shipCenter = ship.getChunkClaim().getCenterBlockCoordinates(VSGameUtilsKt.getYRange(level), new Vector3i());
 		final Vector3i shipOrigin = shipCenter.sub(blueprintDimension.getX() / 2, blueprintDimension.getY() / 2, blueprintDimension.getZ() / 2, new Vector3i());
 
-		blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
+		final List<ISchematicDataBlockEntity> dataBlocks = blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
 
 		// TODO: this may not work correct on scaled ship
 		final Vector3d absPosition = worldOrigin
@@ -662,6 +663,10 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 					return null;
 				}
 			});
+		}
+
+		for (final ISchematicDataBlockEntity dataBlock : dataBlocks) {
+			dataBlock.onPlacedByShip(selfShip, ship);
 		}
 
 		for (final PrintPlugin plugin : this.plugins) {

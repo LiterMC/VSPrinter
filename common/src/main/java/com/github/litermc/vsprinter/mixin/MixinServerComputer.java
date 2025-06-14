@@ -1,6 +1,5 @@
 package com.github.litermc.vsprinter.mixin;
 
-import com.github.litermc.vsprinter.accessor.IComputerAccessor;
 import com.github.litermc.vsprinter.accessor.IServerComputerAccessor;
 
 import dan200.computercraft.core.computer.Computer;
@@ -26,6 +25,6 @@ public abstract class MixinServerComputer implements IServerComputerAccessor {
 
 	@Override
 	public FileSystem vsp$getFileSystem() {
-		return ((IComputerAccessor) (this.computer)).vsp$getFileSystem();
+		return this.computer.getAPIEnvironment().getFileSystem();
 	}
 }

@@ -2,6 +2,8 @@ package com.github.litermc.vsprinter.api;
 
 import net.minecraft.nbt.CompoundTag;
 
+import org.valkyrienskies.core.api.ships.ServerShip;
+
 import javax.annotation.Nullable;
 
 public interface ISchematicDataBlockEntity {
@@ -20,4 +22,6 @@ public interface ISchematicDataBlockEntity {
 	 * @param data The schema data {@link #getPrintSchemaData} returns
 	 */
 	void loadPrintableSchematicData(@Nullable CompoundTag data);
+
+	default void onPlacedByShip(@Nullable ServerShip parentShip, ServerShip currentShip) {}
 }

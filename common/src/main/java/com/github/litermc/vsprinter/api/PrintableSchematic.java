@@ -301,18 +301,22 @@ public class PrintableSchematic {
 		return HexFormat.of().formatHex(md.digest());
 	}
 
-	public void placeInLevel(final Level level, final BlockPos origin) {
+	public List<ISchematicDataBlockEntity> placeInLevel(final Level level, final BlockPos origin) {
 		this.stream().forEach((data) -> {
 			final BlockPos target = origin.offset(data.position());
 			level.setBlock(target, data.blockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
 		});
 
+		final ArrayList<ISchematicDataBlockEntity> dataBlocks = new ArrayList<>();
 		this.stream().forEach((data) -> {
 			final BlockPos target = origin.offset(data.position());
 			if (level.getBlockEntity(target) instanceof ISchematicDataBlockEntity dataBlock) {
 				dataBlock.loadPrintableSchematicData(data.data());
+				dataBlocks.add(dataBlock);
 			}
 			level.blockUpdated(target, level.getBlockState(target).getBlock());
 		});
+		dataBlocks.trimToSize();
+		return dataBlocks;
 	}
 }
