@@ -26,7 +26,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
-import net.minecraft.world.Container;
+import net.minecraft.world.Clearable;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -60,9 +60,9 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 
-public class PrinterControllerBlockEntity extends BlockEntity implements Container {
+public class PrinterControllerBlockEntity extends BlockEntity implements Clearable {
 	private static final int MAX_RESOURCE_TYPE = 128;
-	private static final int MAX_RESOURCE_AMOUNT = 1024;
+	private static final int MAX_RESOURCE_AMOUNT = 1024 * StackUtil.UNIT;
 
 	private final List<PrintPlugin> plugins = new ArrayList<>();
 
@@ -80,7 +80,10 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 	private Queue<ItemStack> pendingItems = null;
 	private int progress = 0;
 
+	private int energyStored = 0;
+
 	private AABB frameCache = null;
+	private int lastSignal = 0;
 
 	public PrinterControllerBlockEntity(final BlockPos pos, final BlockState state) {
 		super(VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get(), pos, state);
@@ -127,14 +130,10 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		if (item.getCount() != 1) {
 			return false;
 		}
-		final String fingerprint = QuantumFilmItem.getBlueprint(item);
-		if (fingerprint == null) {
+		if (QuantumFilmItem.getBlueprint(item) == null) {
 			return false;
 		}
 		this.blueprintItem = item;
-		if (!this.getLevel().isClientSide) { // DEBUG
-			this.startPrint(SchematicManager.get().getSchematic(fingerprint));
-		}
 		this.setChanged();
 		return true;
 	}
@@ -156,33 +155,48 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 	/**
 	 * put an item to the printer's storage
 	 *
-	 * @return {@code true} if action succeed, otherwise {@code false}
+	 * @return The remaining units
 	 */
-	public boolean putItemUnit(final ItemStack stack) {
+	public ItemStack putItemUnit(final ItemStack stack) {
+		return this.putItemUnit(stack, false);
+	}
+
+	public ItemStack putItemUnit(final ItemStack stack, final boolean simulate) {
+		if (stack.isEmpty()) {
+			return stack;
+		}
+		final Item item = stack.getItem();
 		final CompoundTag tag = stack.getTag();
+		final boolean canPutMore = this.nbtItems.size() + this.items.size() < MAX_RESOURCE_TYPE;
 		if (tag == null || tag.isEmpty()) {
-			this.items.computeInt(stack.getItem(), (i, v) -> {
-				if (v == null) {
-					if (this.nbtItems.size() + this.items.size() >= MAX_RESOURCE_TYPE) {
-						return null;
-					}
-					return stack.getCount();
-				}
-				return v + stack.getCount();
-			});
-			return true;
+			final int count = this.items.getOrDefault(item, 0);
+			if (count == 0 && !canPutMore) {
+				return stack;
+			}
+			final int newCount = Math.min(count + stack.getCount(), MAX_RESOURCE_AMOUNT);
+			stack.shrink(newCount - count);
+			if (!simulate) {
+				this.items.put(item, newCount);
+			}
+			return stack;
 		}
 		for (final ItemStack s : this.nbtItems) {
-			if (stack.getItem() == s.getItem() && tag.equals(s.getTag())) {
-				s.grow(stack.getCount());
-				return true;
+			if (item == s.getItem() && tag.equals(s.getTag())) {
+				final int newCount = Math.min(s.getCount() + stack.getCount(), MAX_RESOURCE_AMOUNT);
+				stack.shrink(newCount - s.getCount());
+				if (!simulate) {
+					s.setCount(newCount);
+				}
+				return stack;
 			}
 		}
-		if (this.nbtItems.size() + this.items.size() < MAX_RESOURCE_TYPE) {
-			this.nbtItems.add(stack);
-			return true;
+		if (!canPutMore) {
+			return stack;
 		}
-		return false;
+		if (!simulate) {
+			this.nbtItems.add(stack);
+		}
+		return ItemStack.EMPTY;
 	}
 
 	/**
@@ -233,17 +247,10 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		this.nbtItems.clear();
 	}
 
-	@Override
 	public int getContainerSize() {
 		return 2 + this.items.size() + this.nbtItems.size();
 	}
 
-	@Override
-	public boolean isEmpty() {
-		return this.blueprintItem.isEmpty() && this.items.isEmpty() && this.nbtItems.isEmpty();
-	}
-
-	@Override
 	public ItemStack getItem(int slot) {
 		if (slot == 0) {
 			return this.getBlueprintItem();
@@ -260,83 +267,38 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 		return this.items.object2IntEntrySet().stream().skip(slot).findFirst().map((entry) -> new ItemStack(entry.getKey(), entry.getValue())).orElse(ItemStack.EMPTY);
 	}
 
-	@Override
-	public ItemStack removeItem(final int slot, final int count) {
-		if (slot == 0) {
-			return this.takeBlueprintItem();
-		}
-		return ItemStack.EMPTY;
-	}
-
-	@Override
-	public ItemStack removeItemNoUpdate(final int slot) {
-		if (slot == 0) {
-			final ItemStack item = this.blueprintItem;
-			this.blueprintItem = ItemStack.EMPTY;
-			return item;
-		}
-		return ItemStack.EMPTY;
-	}
-
-	@Override
-	public void setItem(final int slot, final ItemStack stack) {
-		switch (slot) {
-		case 0 -> this.putBlueprintItem(stack);
-		case 1 -> this.putItemUnit(StackUtil.convertStackToUnits(stack));
-		}
-	}
-
-	@Override
 	public int getMaxStackSize() {
-		return MAX_RESOURCE_AMOUNT;
+		return MAX_RESOURCE_AMOUNT / StackUtil.UNIT;
 	}
 
-	@Override
-	public boolean stillValid(final Player player) {
-		return true;
-	}
-
-	@Override
-	public boolean canPlaceItem(final int slot, final ItemStack stack) {
-		if (slot == 0) {
-			return this.blueprintItem.isEmpty() && stack.is(VSPRegistry.Items.QUANTUM_FILM.get()) && stack.getCount() == 1;
+	public int receiveEnergy(final int maxReceive, final boolean simulate) {
+		final int avaliable = this.getMaxEnergyStored() - this.energyStored;
+		if (avaliable <= 0) {
+			return 0;
 		}
-		return slot == 1;
+		if (!simulate) {
+			this.energyStored += Math.min(avaliable, maxReceive);
+		}
+		return Math.max(maxReceive - avaliable, 0);
 	}
 
-	@Override
-	public boolean canTakeItem(final Container other, final int slot, final ItemStack stack) {
-		return slot == 0;
+	public int getEnergyStored() {
+		return this.energyStored;
 	}
 
-	@Override
-	public int countItem(final Item item) {
-		int count = 0;
-		if (this.getBlueprintItem().getItem() == item) {
-			count++;
-		}
-		count += this.items.getInt(item);
-		count += this.nbtItems.stream().map(ItemStack::getItem).filter(item::equals).count();
-		return count;
+	/**
+	 * Return the energy use to print one block.
+	 * The actualy energy usage will be scaled based on the scale difference.
+	 *
+	 * @return the energy use to print standard block.
+	 */
+	public int getEnergyConsumeRate() {
+		// TODO: config
+		return 1024;
 	}
 
-	@Override
-	public boolean hasAnyOf(final Set<Item> items) {
-		final Item blueprintItem = this.getBlueprintItem().getItem();
-		for (final Item item : items) {
-			if (blueprintItem == item) {
-				return true;
-			}
-			if (this.items.getInt(item) > 0) {
-				return true;
-			}
-		}
-		for (final Item item : items) {
-			if (this.nbtItems.stream().map(ItemStack::getItem).anyMatch(item::equals)) {
-				return true;
-			}
-		}
-		return false;
+	public int getMaxEnergyStored() {
+		return this.getEnergyConsumeRate() * 2;
 	}
 
 	@Override
@@ -382,6 +344,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 				}
 			}
 		}
+		this.lastSignal = data.getInt("LastSignal");
 	}
 
 	@Override
@@ -401,10 +364,11 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			}
 		}
 		data.put("NbtItems", nbtItems);
-		this.saveAdditionalShared(data);
+		data.putInt("LastSignal", this.lastSignal);
+		this.saveShared(data);
 	}
 
-	protected void saveAdditionalShared(final CompoundTag data) {
+	protected void saveShared(final CompoundTag data) {
 		data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
 		data.putByte("Status", (byte) (this.status.ordinal()));
 		if (this.blueprintItem != null) {
@@ -428,7 +392,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 	@Override
 	public CompoundTag getUpdateTag() {
 		CompoundTag data = super.getUpdateTag();
-		this.saveAdditionalShared(data);
+		this.saveShared(data);
 		return data;
 	}
 
@@ -473,6 +437,17 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 			box.minX + frameSize, box.minY + frameSize, box.minZ + frameSize,
 			box.maxX + 1 - frameSize, box.maxY + 1 - frameSize, box.maxZ + 1 - frameSize
 		);
+	}
+
+	public void neighborChanged(final BlockPos neighborPos) {
+		if (!(this.getLevel() instanceof ServerLevel level)) {
+			return;
+		}
+		final int newSignal = level.getBestNeighborSignal(this.getBlockPos());
+		if (newSignal > 0 && this.lastSignal == 0 && this.blueprint == null) {
+			this.startPrint(SchematicManager.get().getSchematic(QuantumFilmItem.getBlueprint(this.blueprintItem)));
+		}
+		this.lastSignal = newSignal;
 	}
 
 	public void serverTick() {
@@ -521,6 +496,10 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Contain
 	 */
 	public void startPrint(final PrintableSchematic blueprint) {
 		this.status = PrintStatus.IDLE;
+		if (blueprint == null) {
+			this.setStatus(PrintStatus.EMPTY_BLUEPRINT);
+			return;
+		}
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
 		if (frame == null) {

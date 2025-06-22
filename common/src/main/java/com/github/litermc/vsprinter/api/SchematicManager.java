@@ -39,7 +39,7 @@ public final class SchematicManager {
 	}
 
 	public PrintableSchematic getSchematic(final String fingerprint) {
-		return this.cachedSchematic.computeIfAbsentUnref(fingerprint, this::loadSchematic);
+		return fingerprint == null ? null : this.cachedSchematic.computeIfAbsentUnref(fingerprint, this::loadSchematic);
 	}
 
 	public void putSchematic(final PrintableSchematic schematic) {

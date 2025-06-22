@@ -4,7 +4,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 public final class StackUtil {
-	private static final int UNIT = 256;
+	public static final int UNIT = 256;
 
 	private StackUtil() {}
 
@@ -13,6 +13,9 @@ public final class StackUtil {
 	}
 
 	public static ItemStack setStackToUnits(final ItemStack stack) {
+		if (stack.isEmpty()) {
+			return stack;
+		}
 		final Item item = stack.getItem();
 		if (item.canBeDepleted()) {
 			final int remainDamage = item.getMaxDamage() - stack.getDamageValue();
@@ -32,6 +35,9 @@ public final class StackUtil {
 	}
 
 	public static ItemStack setUnitsToStack(final ItemStack stack) {
+		if (stack.isEmpty()) {
+			return stack;
+		}
 		final Item item = stack.getItem();
 		if (item.canBeDepleted()) {
 			final int maxDamage = item.getMaxDamage();

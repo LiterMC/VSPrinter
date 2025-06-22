@@ -59,12 +59,19 @@ public class PrinterControllerBlock extends Block implements EntityBlock {
 	}
 
 	@Override
+	public void neighborChanged(final BlockState state, final Level level, final BlockPos pos, final Block block, final BlockPos neighborPos, final boolean isMoving) {
+		if (level.getBlockEntity(pos) instanceof PrinterControllerBlockEntity controller) {
+			controller.neighborChanged(neighborPos);
+		}
+	}
+
+	@Override
 	public PrinterControllerBlockEntity newBlockEntity(final BlockPos pos, final BlockState state) {
 		return new PrinterControllerBlockEntity(pos, state);
 	}
 
 	@Override
-	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(final Level level, final BlockState state, final BlockEntityType<T> type) {
 		if (type != VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get()) {
 			return null;
 		}
