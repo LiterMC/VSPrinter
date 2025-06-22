@@ -108,6 +108,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		if (this.status == status) {
 			return;
 		}
+		System.out.println("setStatus: " + status);
 		this.status = status;
 		this.setChanged();
 	}
@@ -455,6 +456,12 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			return;
 		}
 		if (this.pendingItems == null) {
+			final int newEnergy = this.energyStored - this.getEnergyConsumeRate();
+			if (newEnergy < 0) {
+				this.setStatus(PrintStatus.REQUIRE_ENERGY);
+				return;
+			}
+			this.energyStored = newEnergy;
 			if (this.canFinishPrint()) {
 				this.finishPrint();
 				return;
@@ -486,6 +493,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	protected void onRequireItem(final ItemStack stack) {
 		// TODO: send notification to client
+		System.out.println("onRequireItem: " + stack);
 		this.setStatus(PrintStatus.REQUIRE_MATERIAL);
 	}
 
