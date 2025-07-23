@@ -8,6 +8,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -67,6 +68,11 @@ public class PrinterFrameBlock extends Block {
 	}
 
 	@Override
+	public RenderShape getRenderShape(final BlockState state) {
+		return state.getValue(CONTROLLER) == NullableDirection.NULL ? RenderShape.MODEL : RenderShape.INVISIBLE;
+	}
+
+	@Override
 	public VoxelShape getShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
 		final AABBi box = getFrameBox(level, pos);
 		final EnumSet<Direction> faces;
@@ -77,6 +83,9 @@ public class PrinterFrameBlock extends Block {
 		} else {
 			faces = EnumSet.noneOf(Direction.class);
 			frameLevel = getFrameLevel(box);
+			if (frameLevel >= 3) {
+				return Shapes.block();
+			}
 			final int x = pos.getX(), y = pos.getY(), z = pos.getZ();
 			if (box.minX == x) {
 				faces.add(Direction.WEST);
@@ -96,9 +105,6 @@ public class PrinterFrameBlock extends Block {
 			if (box.maxZ == z) {
 				faces.add(Direction.SOUTH);
 			}
-		}
-		if (frameLevel >= 3) {
-			return Shapes.block();
 		}
 		final double n = switch (frameLevel) {
 		case 0 -> 1;

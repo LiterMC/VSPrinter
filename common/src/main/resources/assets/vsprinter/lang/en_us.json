@@ -1,0 +1,6 @@
+{
+	"block.vsprinter.printer_controller": "Printer Controller",
+	"block.vsprinter.printer_frame": "Printer Frame",
+	"item.vsprinter.quantum_film": "Quantum Film",
+	"itemGroup.vsprinter": "VS Printer"
+}

@@ -1,0 +1,64 @@
+{
+	"variants": {
+		"orientation=north_up": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 0,
+			"y": 0
+		},
+		"orientation=south_up": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 0,
+			"y": 180
+		},
+		"orientation=west_up": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 0,
+			"y": -90
+		},
+		"orientation=east_up": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 0,
+			"y": 90
+		},
+		"orientation=up_north": {
+			"model": "vsprinter:block/printer_controller",
+			"x": -90,
+			"y": 180
+		},
+		"orientation=up_south": {
+			"model": "vsprinter:block/printer_controller",
+			"x": -90,
+			"y": 0
+		},
+		"orientation=up_west": {
+			"model": "vsprinter:block/printer_controller",
+			"x": -90,
+			"y": 90
+		},
+		"orientation=up_east": {
+			"model": "vsprinter:block/printer_controller",
+			"x": -90,
+			"y": -90
+		},
+		"orientation=down_north": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 90,
+			"y": 0
+		},
+		"orientation=down_south": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 90,
+			"y": 180
+		},
+		"orientation=down_west": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 90,
+			"y": -90
+		},
+		"orientation=down_east": {
+			"model": "vsprinter:block/printer_controller",
+			"x": 90,
+			"y": 90
+		}
+	}
+}

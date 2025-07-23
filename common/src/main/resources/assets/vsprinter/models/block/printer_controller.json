@@ -1,0 +1,24 @@
+{
+	"parent": "minecraft:block/block",
+	"textures": {
+		"back": "vsprinter:block/printer_controller_back",
+		"front": "vsprinter:block/printer_controller_front",
+		"left": "vsprinter:block/printer_controller_left",
+		"particle": "vsprinter:block/printer_controller_left",
+		"top": "vsprinter:block/printer_controller_top"
+	},
+	"elements": [
+		{
+			"from": [0, 0, 0],
+			"to": [16, 16, 16],
+			"faces": {
+				"down":  { "texture": "#top", "cullface": "down" },
+				"up":    { "texture": "#top", "cullface": "up" },
+				"north": { "texture": "#front", "cullface": "north" },
+				"south": { "texture": "#back", "cullface": "south" },
+				"west":  { "texture": "#left", "cullface": "west", "uv": [16, 0, 0, 16] },
+				"east":  { "texture": "#left", "cullface": "east" }
+			}
+		}
+	]
+}

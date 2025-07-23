@@ -83,6 +83,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	private int energyStored = 0;
 
 	private AABB frameCache = null;
+	private int frameLevel = -1;
 	private int lastSignal = 0;
 
 	public PrinterControllerBlockEntity(final BlockPos pos, final BlockState state) {
@@ -141,6 +142,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	void invalidate() {
 		this.frameCache = null;
+		this.frameLevel = -1;
 		this.blueprint = null;
 		this.printing = null;
 		this.pendingItems = null;
@@ -413,6 +415,11 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		return Math.sqrt(ship.getTransform().getShipToWorldScaling().lengthSquared() / 3);
 	}
 
+	public int getFrameLevel() {
+		this.getFrameSpace();
+		return this.frameLevel;
+	}
+
 	public AABB getFrameSpace() {
 		if (this.frameCache != null) {
 			return this.frameCache;
@@ -422,12 +429,17 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			return null;
 		}
 		final AABBi box = PrinterFrameBlock.getFrameBox(this.getLevel(), this.getBlockPos().relative(frameDir));
-		this.frameCache = this.adjustFrame(box);
+
+		this.frameLevel = this.calcFrameLevel(box);
+		this.frameCache = this.adjustFrame(box, this.frameLevel);
 		return this.frameCache;
 	}
 
-	protected AABB adjustFrame(final AABBi box) {
-		final int level = PrinterFrameBlock.getFrameLevel(box);
+	protected int calcFrameLevel(final AABBi box) {
+		return PrinterFrameBlock.getFrameLevel(box);
+	}
+
+	protected AABB adjustFrame(final AABBi box, final int level) {
 		final double frameSize = switch (level) {
 			case 0 -> 1.0 / 16;
 			case 1 -> 3.0 / 16;
@@ -438,6 +450,16 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			box.minX + frameSize, box.minY + frameSize, box.minZ + frameSize,
 			box.maxX + 1 - frameSize, box.maxY + 1 - frameSize, box.maxZ + 1 - frameSize
 		);
+	}
+
+	// @Override forge only
+	public AABB getRenderBoundingBox() {
+		AABB box = new AABB(this.getBlockPos());
+		final AABB frameBox = this.getFrameSpace();
+		if (frameBox != null) {
+			box = box.minmax(frameBox);
+		}
+		return box;
 	}
 
 	public void neighborChanged(final BlockPos neighborPos) {

@@ -1,0 +1,7 @@
+{
+	"variants": {
+		"": {
+			"model": "vsprinter:block/printer_frame"
+		}
+	}
+}
