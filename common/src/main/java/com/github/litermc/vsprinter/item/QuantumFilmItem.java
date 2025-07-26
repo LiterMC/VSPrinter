@@ -92,7 +92,7 @@ public class QuantumFilmItem extends Item {
 			setBlockPos(stack, FIRST_POS_TAG, pos);
 			player.displayClientMessage(
 				Component.literal(String.format("First Corner Set - %d %d %d", pos.getX(), pos.getY(), pos.getZ()))
-					.append("\n")
+					.append(" | ")
 					.append(Component.literal("Click to set the second corner")),
 				true
 			);
@@ -111,7 +111,7 @@ public class QuantumFilmItem extends Item {
 			setBlockPos(stack, SECOND_POS_TAG, pos);
 			player.displayClientMessage(
 				Component.literal(String.format("Second Corner Set - %d %d %d", pos.getX(), pos.getY(), pos.getZ()))
-					.append("\n")
+					.append(" | ")
 					.append(Component.literal("Click to save area")),
 				true
 			);
