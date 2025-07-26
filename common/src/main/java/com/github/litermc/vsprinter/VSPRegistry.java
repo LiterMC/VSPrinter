@@ -46,6 +46,8 @@ public final class VSPRegistry {
 			REGISTRY.register("printer_controller", () -> new PrinterControllerBlock(
 				BlockBehaviour.Properties.of()
 					.strength(3f)
+					.pushReaction(PushReaction.IGNORE)
+					.isRedstoneConductor((state, level, pos) -> false)
 					.requiresCorrectToolForDrops()));
 		public static final RegistryEntry<Block> PRINTER_FRAME =
 			REGISTRY.register("printer_frame", () -> new PrinterFrameBlock(

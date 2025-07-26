@@ -4,6 +4,7 @@ import com.github.litermc.vsprinter.block.property.NullableDirection;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
@@ -12,9 +13,10 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -38,8 +40,10 @@ public class PrinterFrameBlock extends Block {
 	public static final BooleanProperty WEST = BlockStateProperties.WEST;
 	public static final BooleanProperty EAST = BlockStateProperties.EAST;
 	public static final EnumProperty<NullableDirection> CONTROLLER = EnumProperty.create("controller", NullableDirection.class);
+	// TODO: remvoe the valid prop
+	private static final BooleanProperty VALID = BooleanProperty.create("valid");
 
-	private static final EnumMap<Direction, BooleanProperty> DIRECTION_MAP = new EnumMap<>(
+	private static final EnumMap<Direction, BooleanProperty> DIRECTION_PROP_MAP = new EnumMap<>(
 		Map.of(
 			Direction.DOWN, DOWN,
 			Direction.UP, UP,
@@ -53,58 +57,50 @@ public class PrinterFrameBlock extends Block {
 	public PrinterFrameBlock(final BlockBehaviour.Properties props) {
 		super(props);
 		BlockState defaultState = this.defaultBlockState();
-		for (final BooleanProperty dir : DIRECTION_MAP.values()) {
+		for (final BooleanProperty dir : DIRECTION_PROP_MAP.values()) {
 			defaultState = defaultState.setValue(dir, false);
 		}
 		defaultState = defaultState.setValue(CONTROLLER, NullableDirection.NULL);
+		defaultState = defaultState.setValue(VALID, false);
 		this.registerDefaultState(defaultState);
 	}
 
 	@Override
 	public void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-		DIRECTION_MAP.values().forEach(builder::add);
+		DIRECTION_PROP_MAP.values().forEach(builder::add);
 		builder.add(CONTROLLER);
+		builder.add(VALID);
 		super.createBlockStateDefinition(builder);
 	}
 
 	@Override
+	public BlockState getStateForPlacement(final BlockPlaceContext context) {
+		BlockState state = this.defaultBlockState();
+		final Level level = context.getLevel();
+		final BlockPos pos = context.getClickedPos();
+		for (final Direction dir : Direction.values()) {
+			if (level.getBlockState(pos.relative(dir)).getBlock() instanceof PrinterControllerBlock) {
+				state = state.setValue(CONTROLLER, NullableDirection.fromDirection(dir));
+				state = state.setValue(VALID, getFrameBox(level, pos, state) != null);
+				return state;
+			}
+		}
+		return state;
+	}
+
+	@Override
 	public RenderShape getRenderShape(final BlockState state) {
-		return state.getValue(CONTROLLER) == NullableDirection.NULL ? RenderShape.MODEL : RenderShape.INVISIBLE;
+		return state.getValue(VALID)
+			? RenderShape.INVISIBLE
+			: RenderShape.MODEL;
 	}
 
 	@Override
 	public VoxelShape getShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
-		final AABBi box = getFrameBox(level, pos);
-		final EnumSet<Direction> faces;
-		final int frameLevel;
-		if (box == null) {
-			faces = EnumSet.allOf(Direction.class);
-			frameLevel = 0;
-		} else {
-			faces = EnumSet.noneOf(Direction.class);
-			frameLevel = getFrameLevel(box);
-			if (frameLevel >= 3) {
-				return Shapes.block();
-			}
-			final int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-			if (box.minX == x) {
-				faces.add(Direction.WEST);
-			}
-			if (box.maxX == x) {
-				faces.add(Direction.EAST);
-			}
-			if (box.minY == y) {
-				faces.add(Direction.DOWN);
-			}
-			if (box.maxY == y) {
-				faces.add(Direction.UP);
-			}
-			if (box.minZ == z) {
-				faces.add(Direction.NORTH);
-			}
-			if (box.maxZ == z) {
-				faces.add(Direction.SOUTH);
-			}
+		final AABBi box = state.getValue(CONTROLLER) != NullableDirection.NULL && state.getValue(VALID) ? getFrameBox(level, pos) : null;
+		final int frameLevel = box == null ? 0 : getFrameLevel(box);
+		if (frameLevel >= 3) {
+			return Shapes.block();
 		}
 		final double n = switch (frameLevel) {
 		case 0 -> 1;
@@ -112,49 +108,50 @@ public class PrinterFrameBlock extends Block {
 		case 2 -> 7;
 		default -> throw new IllegalStateException("unreachable");
 		};
+		final EnumSet<Direction> faces = getFacesFromBox(box, pos);
 		VoxelShape shape = Shapes.empty();
 		if (faces.contains(Direction.DOWN)) {
 			if (faces.contains(Direction.WEST)) {
-				shape = Shapes.or(shape, Block.box(0, 0, 0, n, n, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 0, 0, n, n, 16), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.EAST)) {
-				shape = Shapes.or(shape, Block.box(16 - n, 0, 0, 16, n, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(16 - n, 0, 0, 16, n, 16), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.NORTH)) {
-				shape = Shapes.or(shape, Block.box(0, 0, 0, 16, n, n));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 0, 0, 16, n, n), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.SOUTH)) {
-				shape = Shapes.or(shape, Block.box(0, 0, 16 - n, 16, n, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 0, 16 - n, 16, n, 16), BooleanOp.OR);
 			}
 		}
 		if (faces.contains(Direction.UP)) {
 			if (faces.contains(Direction.WEST)) {
-				shape = Shapes.or(shape, Block.box(0, 16 - n, 0, n, 16, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 16 - n, 0, n, 16, 16), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.EAST)) {
-				shape = Shapes.or(shape, Block.box(16 - n, 16 - n, 0, 16, 16, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(16 - n, 16 - n, 0, 16, 16, 16), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.NORTH)) {
-				shape = Shapes.or(shape, Block.box(0, 16 - n, 0, 16, 16, n));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 16 - n, 0, 16, 16, n), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.SOUTH)) {
-				shape = Shapes.or(shape, Block.box(0, 16 - n, 16 - n, 16, 16, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 16 - n, 16 - n, 16, 16, 16), BooleanOp.OR);
 			}
 		}
 		if (faces.contains(Direction.NORTH)) {
 			if (faces.contains(Direction.WEST)) {
-				shape = Shapes.or(shape, Block.box(0, 0, 0, n, 16, n));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 0, 0, n, 16, n), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.EAST)) {
-				shape = Shapes.or(shape, Block.box(16 - n, 0, 0, 16, 16, n));
+				shape = Shapes.joinUnoptimized(shape, Block.box(16 - n, 0, 0, 16, 16, n), BooleanOp.OR);
 			}
 		}
 		if (faces.contains(Direction.SOUTH)) {
 			if (faces.contains(Direction.WEST)) {
-				shape = Shapes.or(shape, Block.box(0, 0, 16 - n, n, 16, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(0, 0, 16 - n, n, 16, 16), BooleanOp.OR);
 			}
 			if (faces.contains(Direction.EAST)) {
-				shape = Shapes.or(shape, Block.box(16 - n, 0, 16 - n, 16, 16, 16));
+				shape = Shapes.joinUnoptimized(shape, Block.box(16 - n, 0, 16 - n, 16, 16, 16), BooleanOp.OR);
 			}
 		}
 		return shape;
@@ -164,52 +161,62 @@ public class PrinterFrameBlock extends Block {
 	public BlockState updateShape(BlockState self, final Direction face, final BlockState neighbor, final LevelAccessor level, final BlockPos selfPos, final BlockPos neighborPos) {
 		final boolean isFrame = neighbor.getBlock() instanceof PrinterFrameBlock;
 		final boolean isController = neighbor.getBlock() instanceof PrinterControllerBlock;
-		final Direction selfController = self.getValue(CONTROLLER).asDirection();
-		final boolean controllerChanged = selfController == face;
-		self = self.setValue(DIRECTION_MAP.get(face), isFrame);
+		final Direction oldController = self.getValue(CONTROLLER).asDirection();
+		final boolean controllerChanged = oldController == face;
+		self = self.setValue(DIRECTION_PROP_MAP.get(face), isFrame);
 		if (isController) {
 			final Direction neighborFrameDir = neighbor.getValue(PrinterControllerBlock.FRAME).asDirection();
-			if (selfController == null) {
+			if (oldController == null) {
 				if (neighborFrameDir == null || neighborFrameDir == face.getOpposite()) {
 					self = self.setValue(CONTROLLER, NullableDirection.fromDirection(face));
 				}
-			} else if (selfController == face && neighborFrameDir != face.getOpposite()) {
+			} else if (oldController == face && neighborFrameDir != face.getOpposite()) {
 				self = self.setValue(CONTROLLER, NullableDirection.NULL);
 			}
-		} else if (isFrame && (selfController == null || controllerChanged) && neighbor.getValue(CONTROLLER) != NullableDirection.NULL) {
-			invalidateController(level, neighborPos);
-			self = self.setValue(CONTROLLER, NullableDirection.fromDirection(face));
+		} else if (isFrame && (oldController == null || controllerChanged)) {
+			final Direction neighborController = neighbor.getValue(CONTROLLER).asDirection();
+			if (neighborController == null) {
+				if (controllerChanged) {
+					self = self.setValue(CONTROLLER, NullableDirection.NULL);
+				}
+			} else if (neighborController != face.getOpposite()) {
+				invalidateController(level, neighborPos);
+				self = self.setValue(CONTROLLER, NullableDirection.fromDirection(face));
+			}
 		} else if (controllerChanged) {
-			self = self
-				.setValue(DIRECTION_MAP.get(face), false)
-				.setValue(CONTROLLER, NullableDirection.NULL);
+			self = self.setValue(CONTROLLER, NullableDirection.NULL);
 		}
+		self = self.setValue(VALID, self.getValue(CONTROLLER) != NullableDirection.NULL && getFrameBox(level, selfPos) != null);
 		return self;
 	}
 
 	public static Stream<BlockPos> streamSelfAndConnected(final BlockGetter level, final BlockPos pos) {
-		return streamSelfAndConnected(level, pos, new HashSet<>(List.of(pos)));
+		return streamSelfAndConnected(level, pos, level.getBlockState(pos), new HashSet<>(List.of(pos)));
 	}
 
-	private static Stream<BlockPos> streamSelfAndConnected(final BlockGetter level, final BlockPos pos, final Set<BlockPos> visited) {
-		final BlockState state = level.getBlockState(pos);
+	public static Stream<BlockPos> streamSelfAndConnected(final BlockGetter level, final BlockPos pos, final BlockState state) {
+		return streamSelfAndConnected(level, pos, state, new HashSet<>(List.of(pos)));
+	}
+
+	private static Stream<BlockPos> streamSelfAndConnected(final BlockGetter level, final BlockPos pos, final BlockState state, final Set<BlockPos> visited) {
 		if (!(state.getBlock() instanceof PrinterFrameBlock)) {
 			return Stream.empty();
 		}
 		return Stream.concat(
 			Stream.of(pos),
-			DIRECTION_MAP.entrySet().stream()
+			DIRECTION_PROP_MAP.entrySet().stream()
 				.filter((e) -> state.getValue(e.getValue()))
 				.map(Map.Entry::getKey)
 				.map(pos::relative)
 				.filter(visited::add)
-				.flatMap((p) -> streamSelfAndConnected(level, p, visited))
+				.flatMap((p) -> streamSelfAndConnected(level, p, level.getBlockState(p), visited))
 		);
 	}
 
 	public PrinterControllerBlockEntity getController(final BlockGetter level, final BlockPos pos) {
-		final BlockPos.MutableBlockPos p = pos.mutable();
-		while (true) {
+		final Set<BlockPos> visited = new HashSet<>();
+		BlockPos p = pos;
+		while (visited.add(p)) {
 			if (level.getBlockEntity(p) instanceof PrinterControllerBlockEntity be) {
 				return be;
 			}
@@ -221,8 +228,9 @@ public class PrinterFrameBlock extends Block {
 			if (dir == null) {
 				return null;
 			}
-			p.move(dir);
+			p = p.relative(dir);
 		}
+		return null;
 	}
 
 	private void invalidateController(final BlockGetter level, final BlockPos pos) {
@@ -233,7 +241,14 @@ public class PrinterFrameBlock extends Block {
 	}
 
 	public static AABBi getFrameBox(final BlockGetter level, final BlockPos pos) {
-		final List<BlockPos> frames = streamSelfAndConnected(level, pos).toList();
+		return getFrameBox(streamSelfAndConnected(level, pos).toList());
+	}
+
+	public static AABBi getFrameBox(final BlockGetter level, final BlockPos pos, final BlockState state) {
+		return getFrameBox(streamSelfAndConnected(level, pos, state).toList());
+	}
+
+	public static AABBi getFrameBox(final List<BlockPos> frames) {
 		if (frames.isEmpty()) {
 			return null;
 		}
@@ -252,6 +267,33 @@ public class PrinterFrameBlock extends Block {
 			}
 		}
 		return box;
+	}
+
+	public static EnumSet<Direction> getFacesFromBox(final AABBi box, final BlockPos pos) {
+		if (box == null) {
+			return EnumSet.allOf(Direction.class);
+		}
+		final EnumSet<Direction> faces = EnumSet.noneOf(Direction.class);
+		final int x = pos.getX(), y = pos.getY(), z = pos.getZ();
+		if (box.minX == x) {
+			faces.add(Direction.WEST);
+		}
+		if (box.maxX == x) {
+			faces.add(Direction.EAST);
+		}
+		if (box.minY == y) {
+			faces.add(Direction.DOWN);
+		}
+		if (box.maxY == y) {
+			faces.add(Direction.UP);
+		}
+		if (box.minZ == z) {
+			faces.add(Direction.NORTH);
+		}
+		if (box.maxZ == z) {
+			faces.add(Direction.SOUTH);
+		}
+		return faces;
 	}
 
 	private static final boolean isOnEdge(final AABBi box, final int x, final int y, final int z) {

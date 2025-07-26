@@ -39,30 +39,24 @@ import net.minecraft.resources.ResourceLocation;
 public final class RenderUtil {
 	private RenderUtil() {}
 
-	public static void drawBox(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, Vector4f rgba, Vector3i offseti, Quaternionf rot, Vector3i sizei) {
+	public static void drawBox(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, Vector4f rgba, Vector3f offset, Quaternionf rot, Vector3f size) {
 		poseStack.pushPose();
-		// Sizes are in pixels
-		Vector3f offset = new Vector3f(offseti).div(16);
-		Vector3f size = new Vector3f(sizei).div(16);
 
 		poseStack.translate(0.5f, 0.5f, 0.5f);
 		poseStack.mulPose(rot);
+		poseStack.translate(offset.x, offset.y, offset.z);
 
-		drawPlane(poseStack, buffer, lightMap, rgba, Direction.UP, offset, size);
-		drawPlane(poseStack, buffer, lightMap, rgba, Direction.DOWN, offset, size);
-		drawPlane(poseStack, buffer, lightMap, rgba, Direction.EAST, offset, size);
-		drawPlane(poseStack, buffer, lightMap, rgba, Direction.WEST, offset, size);
-		drawPlane(poseStack, buffer, lightMap, rgba, Direction.NORTH, offset, size);
-		drawPlane(poseStack, buffer, lightMap, rgba, Direction.SOUTH, offset, size);
+		drawPlane(poseStack, buffer, lightMap, rgba, Direction.UP, size);
+		drawPlane(poseStack, buffer, lightMap, rgba, Direction.DOWN, size);
+		drawPlane(poseStack, buffer, lightMap, rgba, Direction.EAST, size);
+		drawPlane(poseStack, buffer, lightMap, rgba, Direction.WEST, size);
+		drawPlane(poseStack, buffer, lightMap, rgba, Direction.NORTH, size);
+		drawPlane(poseStack, buffer, lightMap, rgba, Direction.SOUTH, size);
 		poseStack.popPose();
 	}
 
-	public static void drawPlane(PoseStack posestack, VertexConsumer buffer, BoxLightMap lightMap, Vector4f rgba, Direction perspective, Vector3f offset, Vector3f size) {
-		posestack.pushPose();
-
-		posestack.translate(offset.x, offset.y, offset.z);
-
-		Matrix4f matrix4f = posestack.last().pose();
+	public static void drawPlane(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, Vector4f rgba, Direction perspective, Vector3f size) {
+		final Matrix4f matrix4f = poseStack.last().pose();
 
 		float sX = size.x, sY = size.y, sZ = size.z;
 		sX /= 2;
@@ -73,28 +67,28 @@ public final class RenderUtil {
 
 		switch (perspective) {
 			case UP -> {
-				buffer.vertex(matrix4f, -sX, sY, sZ).color(r, g, b, a).uv2(lightMap.usw).endVertex();
-				buffer.vertex(matrix4f, sX, sY, sZ).color(r, g, b, a).uv2(lightMap.use).endVertex();
-				buffer.vertex(matrix4f, sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.une).endVertex();
-				buffer.vertex(matrix4f, -sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.unw).endVertex();
+				buffer.vertex(matrix4f, -sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.usw).endVertex();
+				buffer.vertex(matrix4f, -sX, sY, sZ).color(r, g, b, a).uv2(lightMap.use).endVertex();
+				buffer.vertex(matrix4f, sX, sY, sZ).color(r, g, b, a).uv2(lightMap.une).endVertex();
+				buffer.vertex(matrix4f, sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.unw).endVertex();
 			}
 			case DOWN -> {
-				buffer.vertex(matrix4f, -sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.dsw).endVertex();
-				buffer.vertex(matrix4f, -sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.dnw).endVertex();
-				buffer.vertex(matrix4f, sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.dne).endVertex();
-				buffer.vertex(matrix4f, sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.dse).endVertex();
+				buffer.vertex(matrix4f, -sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.dsw).endVertex();
+				buffer.vertex(matrix4f, sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.dnw).endVertex();
+				buffer.vertex(matrix4f, sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.dne).endVertex();
+				buffer.vertex(matrix4f, -sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.dse).endVertex();
 			}
 			case SOUTH -> {
-				buffer.vertex(matrix4f, sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.sdw).endVertex();
-				buffer.vertex(matrix4f, -sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.sde).endVertex();
-				buffer.vertex(matrix4f, -sX, sY, sZ).color(r, g, b, a).uv2(lightMap.suw).endVertex();
-				buffer.vertex(matrix4f, sX, sY, sZ).color(r, g, b, a).uv2(lightMap.sue).endVertex();
+				buffer.vertex(matrix4f, -sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.sdw).endVertex();
+				buffer.vertex(matrix4f, sX, -sY, sZ).color(r, g, b, a).uv2(lightMap.sde).endVertex();
+				buffer.vertex(matrix4f, sX, sY, sZ).color(r, g, b, a).uv2(lightMap.suw).endVertex();
+				buffer.vertex(matrix4f, -sX, sY, sZ).color(r, g, b, a).uv2(lightMap.sue).endVertex();
 			}
 			case NORTH -> {
-				buffer.vertex(matrix4f, sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.nde).endVertex();
-				buffer.vertex(matrix4f, sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.nue).endVertex();
-				buffer.vertex(matrix4f, -sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.nuw).endVertex();
-				buffer.vertex(matrix4f, -sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.ndw).endVertex();
+				buffer.vertex(matrix4f, -sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.nde).endVertex();
+				buffer.vertex(matrix4f, -sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.nue).endVertex();
+				buffer.vertex(matrix4f, sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.nuw).endVertex();
+				buffer.vertex(matrix4f, sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.ndw).endVertex();
 			}
 			case EAST -> {
 				buffer.vertex(matrix4f, sX, -sY, -sZ).color(r, g, b, a).uv2(lightMap.edn).endVertex();
@@ -109,7 +103,6 @@ public final class RenderUtil {
 				buffer.vertex(matrix4f, -sX, sY, -sZ).color(r, g, b, a).uv2(lightMap.wun).endVertex();
 			}
 		}
-		posestack.popPose();
 	}
 
 	public static void drawBoxWithTexture(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, ModelTextures model, Vector3f rgb, Vector3f offset, Quaternionf rot, Vector3i size, float scale) {
@@ -121,26 +114,23 @@ public final class RenderUtil {
 
 		poseStack.translate(0.5f, 0.5f, 0.5f);
 		poseStack.mulPose(rot);
+		poseStack.translate(offset.x, offset.y, offset.z);
 
 		for (final Direction dir : Direction.values()) {
 			final TextureLocation texture = model.getTexture(dir);
 			if (texture != null) {
-				drawPlaneWithTexture(poseStack, buffer, lightMap, texture, rgba, dir, offset, size, scale);
+				drawPlaneWithTexture(poseStack, buffer, lightMap, texture, rgba, dir, size, scale);
 			}
 		}
 		poseStack.popPose();
 	}
 
-	public static void drawPlaneWithTexture(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, TextureLocation texture, Vector3f rgb, Direction perspective, Vector3f offset, Vector3i size, float scale) {
-		drawPlaneWithTexture(poseStack, buffer, lightMap, texture, new Vector4f(rgb, 1f), perspective, offset, size, scale);
+	public static void drawPlaneWithTexture(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, TextureLocation texture, Vector3f rgb, Direction perspective, Vector3i size, float scale) {
+		drawPlaneWithTexture(poseStack, buffer, lightMap, texture, new Vector4f(rgb, 1f), perspective, size, scale);
 	}
 
-	public static void drawPlaneWithTexture(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, TextureLocation texture, Vector4f rgba, Direction perspective, Vector3f offset, Vector3i size, float scale) {
-		poseStack.pushPose();
-
-		poseStack.translate(offset.x, offset.y, offset.z);
-
-		Matrix4f matrix4f = poseStack.last().pose();
+	public static void drawPlaneWithTexture(PoseStack poseStack, VertexConsumer buffer, BoxLightMap lightMap, TextureLocation texture, Vector4f rgba, Direction perspective, Vector3i size, float scale) {
+		final Matrix4f matrix4f = poseStack.last().pose();
 
 		float sX = size.x, sY = size.y, sZ = size.z;
 		sX *= scale / 16f / 2;
@@ -205,7 +195,6 @@ public final class RenderUtil {
 				buffer.vertex(matrix4f, -sX, sY, -sZ).color(r, g, b, a).uv(u2, v1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(lightMap.wun).normal(-1f, 0f, 0f).endVertex();
 			}
 		}
-		poseStack.popPose();
 	}
 
 	public static final class BoxLightMap {

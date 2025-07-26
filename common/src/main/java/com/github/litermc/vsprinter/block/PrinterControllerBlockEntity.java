@@ -9,6 +9,7 @@ import com.github.litermc.vsprinter.api.PrintStatus;
 import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
 import com.github.litermc.vsprinter.api.StackUtil;
+import com.github.litermc.vsprinter.block.property.NullableDirection;
 import com.github.litermc.vsprinter.item.QuantumFilmItem;
 import com.github.litermc.vsprinter.ship.ShipPrintedInfoPlugin;
 
@@ -78,6 +79,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	private PrintableSchematic blueprint = null;
 	private Iterator<PrintableSchematic.BlockData> printing = null;
 	private Queue<ItemStack> pendingItems = null;
+	private ItemStack requiredItem = ItemStack.EMPTY;
 	private int progress = 0;
 
 	private int energyStored = 0;
@@ -90,15 +92,27 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		super(VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get(), pos, state);
 
 		this.plugins.add(ShipPrintedInfoPlugin.INSTANCE);
+		if (state.getValue(PrinterControllerBlock.FRAME) != NullableDirection.NULL) {
+			this.status = PrintStatus.IDLE;
+		}
 	}
 
 	public PrintArguments getPrintArgs() {
 		return this.printArgs;
 	}
 
+	/**
+	 * Client only
+	 */
+	public void sendPrintArgs(final PrintArguments args) {
+		this.setPrintArgs(args);
+		final CompoundTag data = this.printArgs.writeToNbt(new CompoundTag());
+		//
+	}
+
 	public void setPrintArgs(final PrintArguments args) {
 		this.printArgs = args.validated();
-		this.setChanged();
+		this.markUpdated();
 	}
 
 	public PrintStatus getStatus() {
@@ -109,9 +123,8 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		if (this.status == status) {
 			return;
 		}
-		System.out.println("setStatus: " + status);
 		this.status = status;
-		this.setChanged();
+		this.markUpdated();
 	}
 
 	public ItemStack getBlueprintItem() {
@@ -140,14 +153,24 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		return true;
 	}
 
+	public ItemStack getRequiredItem() {
+		return this.requiredItem;
+	}
+
+	protected void markUpdated() {
+		this.setChanged();
+		this.getLevel().sendBlockUpdated(this.getBlockPos(), this.getBlockState(), this.getBlockState(), Block.UPDATE_CLIENTS);
+	}
+
 	void invalidate() {
 		this.frameCache = null;
 		this.frameLevel = -1;
 		this.blueprint = null;
 		this.printing = null;
 		this.pendingItems = null;
+		this.requiredItem = ItemStack.EMPTY;
 		this.progress = 0;
-		this.setChanged();
+		this.markUpdated();
 	}
 
 	protected int getScaledCount(int count) {
@@ -327,16 +350,15 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			}
 		}
 		if (data.contains("PrintArgs")) {
-			this.setPrintArgs(PrintArguments.readFromNbt(data.getCompound("PrintArgs")));
+			this.printArgs = PrintArguments.readFromNbt(data.getCompound("PrintArgs"));
 		} else {
-			this.setPrintArgs(PrintArguments.DEFAULT);
+			this.printArgs = PrintArguments.DEFAULT;
 		}
 		this.status = PrintStatus.values()[data.getByte("Status")];
-		this.blueprintItem = ItemStack.of(data.getCompound("BlueprintItem"));
+		this.blueprintItem = data.contains("BlueprintItem") ? ItemStack.of(data.getCompound("BlueprintItem")) : ItemStack.EMPTY;
 		if (data.contains("Blueprint")) {
 			this.blueprint = SchematicManager.get().getSchematic(data.getString("Blueprint"));
 			if (this.blueprint != null) {
-				this.progress = data.getInt("Progress");
 				this.printing = this.blueprint.stream().skip(this.progress).iterator();
 				this.pendingItems = new ArrayDeque<>();
 				for (final Tag tag : data.getList("PendingItems", Tag.TAG_COMPOUND)) {
@@ -347,6 +369,8 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 				}
 			}
 		}
+		this.progress = data.getInt("Progress");
+		this.requiredItem = data.contains("RequiredItem") ? ItemStack.of(data.getCompound("RequiredItem")) : ItemStack.EMPTY;
 		this.lastSignal = data.getInt("LastSignal");
 	}
 
@@ -367,19 +391,8 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			}
 		}
 		data.put("NbtItems", nbtItems);
-		data.putInt("LastSignal", this.lastSignal);
-		this.saveShared(data);
-	}
-
-	protected void saveShared(final CompoundTag data) {
-		data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
-		data.putByte("Status", (byte) (this.status.ordinal()));
-		if (this.blueprintItem != null) {
-			data.put("BlueprintItem", this.blueprintItem.save(new CompoundTag()));
-		}
 		if (this.blueprint != null) {
 			data.putString("Blueprint", this.blueprint.getFingerprint());
-			data.putInt("Progress", this.progress);
 			if (this.pendingItems != null) {
 				final ListTag pendingItems = new ListTag();
 				for (final ItemStack stack : this.pendingItems) {
@@ -388,6 +401,22 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 					}
 				}
 				data.put("PendingItems", pendingItems);
+			}
+		}
+		data.putInt("LastSignal", this.lastSignal);
+		this.saveShared(data);
+	}
+
+	protected void saveShared(final CompoundTag data) {
+		data.put("PrintArgs", this.printArgs.writeToNbt(new CompoundTag()));
+		data.putByte("Status", (byte) (this.status.ordinal()));
+		if (!this.blueprintItem.isEmpty()) {
+			data.put("BlueprintItem", this.blueprintItem.save(new CompoundTag()));
+		}
+		if (this.blueprint != null) {
+			data.putInt("Progress", this.progress);
+			if (!this.requiredItem.isEmpty()) {
+				data.put("RequiredItem", this.requiredItem.save(new CompoundTag()));
 			}
 		}
 	}
@@ -415,11 +444,6 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		return Math.sqrt(ship.getTransform().getShipToWorldScaling().lengthSquared() / 3);
 	}
 
-	public int getFrameLevel() {
-		this.getFrameSpace();
-		return this.frameLevel;
-	}
-
 	public AABB getFrameSpace() {
 		if (this.frameCache != null) {
 			return this.frameCache;
@@ -430,12 +454,16 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		}
 		final AABBi box = PrinterFrameBlock.getFrameBox(this.getLevel(), this.getBlockPos().relative(frameDir));
 
-		this.frameLevel = this.calcFrameLevel(box);
-		this.frameCache = this.adjustFrame(box, this.frameLevel);
+		if (box == null) {
+			this.frameLevel = -1;
+		} else {
+			this.frameLevel = this.calcFrameLevel(box);
+			this.frameCache = this.adjustFrame(box, this.frameLevel);
+		}
 		return this.frameCache;
 	}
 
-	protected int calcFrameLevel(final AABBi box) {
+	public int calcFrameLevel(final AABBi box) {
 		return PrinterFrameBlock.getFrameLevel(box);
 	}
 
@@ -499,8 +527,9 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			final ItemStack need = this.pendingItems.peek();
 			if (need == null) {
 				this.pendingItems = null;
+				this.requiredItem = ItemStack.EMPTY;
 				this.progress++;
-				this.setChanged();
+				this.markUpdated();
 				return;
 			}
 			final int require = this.tryConsumeUnit(need);
@@ -514,8 +543,10 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	}
 
 	protected void onRequireItem(final ItemStack stack) {
-		// TODO: send notification to client
-		System.out.println("onRequireItem: " + stack);
+		if (!ItemStack.isSameItemSameTags(this.requiredItem, stack)) {
+			this.requiredItem = stack;
+			this.markUpdated();
+		}
 		this.setStatus(PrintStatus.REQUIRE_MATERIAL);
 	}
 
@@ -561,7 +592,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		this.printing = this.blueprint.stream().iterator();
 		this.pendingItems = null;
 		this.progress = 0;
-		this.setChanged();
+		this.markUpdated();
 	}
 
 	public boolean canFinishPrint() {
@@ -574,7 +605,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		this.printing = null;
 		this.pendingItems = null;
 		this.progress = 0;
-		this.setChanged();
+		this.markUpdated();
 
 		if (blueprint == null) {
 			Constants.LOG.warn("Trying to print without a blueprint");

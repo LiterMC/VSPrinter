@@ -61,13 +61,13 @@ public class QuantumFilmItem extends Item {
 			assigningPos = assigningPos.relative(ctx.getClickedFace());
 		}
 
-		return onSetPos(stack, level, player, assigningPos);
+		return this.onSetPos(stack, level, player, assigningPos);
 	}
 
 	@Override
 	public InteractionResultHolder<ItemStack> use(final Level level, final Player player, final InteractionHand hand) {
 		final ItemStack stack = player.getItemInHand(hand);
-		final InteractionResult result = onSetPos(stack, level, player, player.blockPosition());
+		final InteractionResult result = this.onSetPos(stack, level, player, player.blockPosition());
 		return new InteractionResultHolder<>(result, stack);
 	}
 
@@ -75,6 +75,8 @@ public class QuantumFilmItem extends Item {
 		if (level.isClientSide) {
 			return InteractionResult.CONSUME;
 		}
+
+		player.getCooldowns().addCooldown(this, 10);
 
 		if (player.isShiftKeyDown()) {
 			clearBlockPos(stack);
@@ -89,7 +91,9 @@ public class QuantumFilmItem extends Item {
 		if (firstPos == null) {
 			setBlockPos(stack, FIRST_POS_TAG, pos);
 			player.displayClientMessage(
-				Component.literal(String.format("First Pos Set - %d %d %d", pos.getX(), pos.getY(), pos.getZ())),
+				Component.literal(String.format("First Corner Set - %d %d %d", pos.getX(), pos.getY(), pos.getZ()))
+					.append("\n")
+					.append(Component.literal("Click to set the second corner")),
 				true
 			);
 			return InteractionResult.SUCCESS;
@@ -106,7 +110,9 @@ public class QuantumFilmItem extends Item {
 			}
 			setBlockPos(stack, SECOND_POS_TAG, pos);
 			player.displayClientMessage(
-				Component.literal(String.format("Second Pos Set - %d %d %d", pos.getX(), pos.getY(), pos.getZ())),
+				Component.literal(String.format("Second Corner Set - %d %d %d", pos.getX(), pos.getY(), pos.getZ()))
+					.append("\n")
+					.append(Component.literal("Click to save area")),
 				true
 			);
 			return InteractionResult.SUCCESS;
