@@ -13,7 +13,8 @@ public enum PrintStatus {
 	SCALE_TOO_LARGE("scale_too_large"),
 	NOT_ENOUGH_SPACE("not_enough_space"),
 	REQUIRE_ENERGY("require_energy"),
-	REQUIRE_MATERIAL("require_material");
+	REQUIRE_MATERIAL("require_material"),
+	OBSTRUCTED("obstructed");
 
 	private final String key;
 

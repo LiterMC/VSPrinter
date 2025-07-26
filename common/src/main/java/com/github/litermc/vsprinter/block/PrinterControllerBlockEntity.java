@@ -14,8 +14,8 @@ import com.github.litermc.vsprinter.item.QuantumFilmItem;
 import com.github.litermc.vsprinter.ship.ShipPrintedInfoPlugin;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntSortedMap;
 import it.unimi.dsi.fastutil.objects.Object2IntAVLTreeMap;
+import it.unimi.dsi.fastutil.objects.Object2IntSortedMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
@@ -40,10 +40,14 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
+import org.joml.Matrix4d;
+import org.joml.Matrix4dc;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
+import org.joml.primitives.AABBd;
 import org.joml.primitives.AABBi;
 import org.valkyrienskies.core.api.ships.ServerShip;
 import org.valkyrienskies.core.api.ships.ServerShipTransformProvider;
@@ -84,6 +88,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	private int energyStored = 0;
 
+	private int frameCheckCountdown = 0;
 	private AABB frameCache = null;
 	private int frameLevel = -1;
 	private int lastSignal = 0;
@@ -92,9 +97,6 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		super(VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get(), pos, state);
 
 		this.plugins.add(ShipPrintedInfoPlugin.INSTANCE);
-		if (state.getValue(PrinterControllerBlock.FRAME) != NullableDirection.NULL) {
-			this.status = PrintStatus.IDLE;
-		}
 	}
 
 	public PrintArguments getPrintArgs() {
@@ -468,7 +470,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	}
 
 	protected AABB adjustFrame(final AABBi box, final int level) {
-		final double frameSize = switch (level) {
+		final double frameSize = 0.01 + switch (level) {
 			case 0 -> 1.0 / 16;
 			case 1 -> 3.0 / 16;
 			case 2 -> 7.0 / 16;
@@ -502,6 +504,18 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	}
 
 	public void serverTick() {
+		final ServerLevel level = (ServerLevel) this.getLevel();
+		if (this.status == PrintStatus.UNCONSTRUCTED) {
+			if (this.frameCheckCountdown <= 0) {
+				if (this.getBlockState().getValue(PrinterControllerBlock.FRAME) != NullableDirection.NULL && this.getFrameSpace() != null) {
+					this.setStatus(PrintStatus.IDLE);
+				} else {
+					this.frameCheckCountdown = 20;
+				}
+			} else {
+				this.frameCheckCountdown--;
+			}
+		}
 		if (this.printing == null) {
 			return;
 		}
@@ -522,6 +536,40 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 				return;
 			}
 			this.pendingItems = new ArrayDeque<>(itemsList);
+		}
+		final AABB frame = this.getFrameSpace();
+		if (frame == null) {
+			this.setStatus(PrintStatus.UNCONSTRUCTED);
+			return;
+		}
+		final AABBd framed = new AABBd(frame.minX, frame.minY, frame.minZ, frame.maxX, frame.maxY, frame.maxZ);
+		if (!level.noCollision(frame)) {
+			this.setStatus(PrintStatus.OBSTRUCTED);
+			return;
+		}
+		final AABBd frameWorld = new AABBd(framed);
+		final Matrix4d ship2world = new Matrix4d();
+		final Ship selfShip = VSGameUtilsKt.getShipManagingPos(level, this.getBlockPos());
+		if (selfShip != null) {
+			ship2world.set(selfShip.getShipToWorld());
+			frameWorld.transform(ship2world);
+			if (!level.noCollision(new AABB(frameWorld.minX, frameWorld.minY, frameWorld.minZ, frameWorld.maxX, frameWorld.maxY, frameWorld.maxZ))) {
+				this.setStatus(PrintStatus.OBSTRUCTED);
+				return;
+			}
+		}
+		final Matrix4d aabbMat = new Matrix4d();
+		final AABBd convertedFrame = new AABBd();
+		for (final Ship ship : VSGameUtilsKt.getShipsIntersecting(level, frameWorld)) {
+			if (ship == selfShip) {
+				continue;
+			}
+			framed.transform(ship2world.mul(ship.getWorldToShip(), aabbMat), convertedFrame);
+			// TODO: not accurate enough
+			if (!level.noCollision(new AABB(convertedFrame.minX, convertedFrame.minY, convertedFrame.minZ, convertedFrame.maxX, convertedFrame.maxY, convertedFrame.maxZ))) {
+				this.setStatus(PrintStatus.OBSTRUCTED);
+				return;
+			}
 		}
 		while (true) {
 			final ItemStack need = this.pendingItems.peek();
