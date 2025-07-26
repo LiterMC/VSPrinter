@@ -1,0 +1,23 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [
+		"MMM",
+		"MSB",
+		"MMM"
+	],
+	"key": {
+		"B": {
+			"item": "minecraft:slime_ball"
+		},
+		"M": {
+			"item": "minecraft:map"
+		},
+		"S": {
+			"item": "minecraft:nether_star"
+		}
+	},
+	"result": {
+		"item": "vsprinter:quantum_film",
+		"count": 1
+	}
+}

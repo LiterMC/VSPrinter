@@ -186,6 +186,20 @@ public class PrinterFrameBlock extends Block {
 		} else if (controllerChanged) {
 			self = self.setValue(CONTROLLER, NullableDirection.NULL);
 		}
+		// TODO: fix sometimes controller link won't update
+		if (self.getValue(CONTROLLER) == NullableDirection.NULL) {
+			for (final Direction dir : Direction.values()) {
+				if (controllerChanged && dir == face) {
+					continue;
+				}
+				final BlockPos otherPos = selfPos.relative(dir);
+				final BlockState other = level.getBlockState(otherPos);
+				if (other.getBlock() instanceof PrinterControllerBlock || other.getBlock() instanceof PrinterFrameBlock && other.getValue(CONTROLLER) != NullableDirection.NULL && getController(level, otherPos, new HashSet<>(List.of(selfPos))) != null) {
+					self = self.setValue(CONTROLLER, NullableDirection.fromDirection(dir));
+					break;
+				}
+			}
+		}
 		self = self.setValue(VALID, self.getValue(CONTROLLER) != NullableDirection.NULL && getFrameBox(level, selfPos) != null);
 		return self;
 	}
@@ -194,7 +208,7 @@ public class PrinterFrameBlock extends Block {
 		return streamSelfAndConnected(level, pos, level.getBlockState(pos), new HashSet<>(List.of(pos)));
 	}
 
-	public static Stream<BlockPos> streamSelfAndConnected(final BlockGetter level, final BlockPos pos, final BlockState state) {
+	private static Stream<BlockPos> streamSelfAndConnected(final BlockGetter level, final BlockPos pos, final BlockState state) {
 		return streamSelfAndConnected(level, pos, state, new HashSet<>(List.of(pos)));
 	}
 
@@ -213,8 +227,11 @@ public class PrinterFrameBlock extends Block {
 		);
 	}
 
-	public PrinterControllerBlockEntity getController(final BlockGetter level, final BlockPos pos) {
-		final Set<BlockPos> visited = new HashSet<>();
+	public static PrinterControllerBlockEntity getController(final BlockGetter level, final BlockPos pos) {
+		return getController(level, pos, new HashSet<>());
+	}
+
+	private static PrinterControllerBlockEntity getController(final BlockGetter level, final BlockPos pos, final Set<BlockPos> visited) {
 		BlockPos p = pos;
 		while (visited.add(p)) {
 			if (level.getBlockEntity(p) instanceof PrinterControllerBlockEntity be) {
@@ -233,7 +250,7 @@ public class PrinterFrameBlock extends Block {
 		return null;
 	}
 
-	private void invalidateController(final BlockGetter level, final BlockPos pos) {
+	private static void invalidateController(final BlockGetter level, final BlockPos pos) {
 		final PrinterControllerBlockEntity controller = getController(level, pos);
 		if (controller != null) {
 			controller.invalidate();
