@@ -98,7 +98,6 @@ modrinth {
 	gameVersions = ["1.20.1"]
 	loaders = ["forge", "neoforge"]
 	dependencies {
-		// required.project "jade"
-		// required.project "valkyrien-skies"
+		required.project "valkyrien-skies"
 	}
 }
