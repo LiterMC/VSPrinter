@@ -331,6 +331,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	@Override
 	public void load(final CompoundTag data) {
+		this.energyStored = data.getInt("EnergyStored");
 		final CompoundTag items = data.getCompound("Items");
 		this.items.clear();
 		for (final String id : items.getAllKeys()) {
@@ -378,6 +379,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	@Override
 	protected void saveAdditional(final CompoundTag data) {
+		data.putInt("EnergyStored", this.energyStored);
 		final CompoundTag items = new CompoundTag();
 		for (final Object2IntMap.Entry<Item> stack : this.items.object2IntEntrySet()) {
 			final int amount = stack.getIntValue();
