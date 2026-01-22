@@ -304,10 +304,11 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		if (avaliable <= 0) {
 			return 0;
 		}
+		final int received = Math.min(avaliable, maxReceive);
 		if (!simulate) {
-			this.energyStored += Math.min(avaliable, maxReceive);
+			this.energyStored += received;
 		}
-		return Math.max(maxReceive - avaliable, 0);
+		return received;
 	}
 
 	public int getEnergyStored() {
