@@ -71,8 +71,8 @@ public class PrinterControllerRenderer implements BlockEntityRenderer<PrinterCon
 
 		poseStack.pushPose();
 		poseStack.translate(0.5f, 0.5f, 0.5f);
-		poseStack.mulPose(frontAndTop.front().getRotation());
 		poseStack.mulPose(frontAndTop.top().getRotation());
+		poseStack.mulPose(frontAndTop.front().getRotation());
 		poseStack.translate(0, 0, -0.501f);
 
 		poseStack.pushPose();

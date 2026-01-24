@@ -10,8 +10,10 @@ import com.github.litermc.vsprinter.api.PrintableSchematic;
 import com.github.litermc.vsprinter.api.SchematicManager;
 import com.github.litermc.vsprinter.api.StackUtil;
 import com.github.litermc.vsprinter.block.property.NullableDirection;
+import com.github.litermc.vsprinter.compat.computercraft.PrinterControllerPeripheral;
 import com.github.litermc.vsprinter.item.QuantumFilmItem;
 import com.github.litermc.vsprinter.ship.ShipPrintedInfoPlugin;
+import com.github.litermc.vtil.api.assemble.ShipAllocator;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntAVLTreeMap;
@@ -45,18 +47,22 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Matrix4d;
 import org.joml.Matrix4dc;
 import org.joml.Quaterniond;
+import org.joml.Quaterniondc;
 import org.joml.Vector3d;
+import org.joml.Vector3dc;
 import org.joml.Vector3i;
 import org.joml.primitives.AABBd;
 import org.joml.primitives.AABBi;
+import org.valkyrienskies.core.api.bodies.properties.BodyTransform;
 import org.valkyrienskies.core.api.ships.ServerShip;
 import org.valkyrienskies.core.api.ships.ServerShipTransformProvider;
 import org.valkyrienskies.core.api.ships.Ship;
 import org.valkyrienskies.core.api.ships.properties.ShipTransform;
-import org.valkyrienskies.core.apigame.world.ServerShipWorldCore;
 import org.valkyrienskies.core.impl.game.ShipTeleportDataImpl;
 import org.valkyrienskies.core.impl.game.ships.ShipTransformImpl;
+import org.valkyrienskies.core.internal.world.VsiServerShipWorld;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
+import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -68,23 +74,26 @@ import java.util.Set;
 public class PrinterControllerBlockEntity extends BlockEntity implements Clearable {
 	private static final int MAX_RESOURCE_TYPE = 128;
 	private static final int MAX_RESOURCE_AMOUNT = 1024 * StackUtil.UNIT;
+	private static final Quaterniondc ZERO_QUATD = new Quaterniond();
+	private static final Vector3dc ZERO_VEC3D = new Vector3d();
 
 	private final List<PrintPlugin> plugins = new ArrayList<>();
 
-	private final Object2IntSortedMap<Item> items = new Object2IntAVLTreeMap<>((a, b) -> {
-		return Integer.compare(Item.getId(a), Item.getId(b));
-	});
+	private final Object2IntSortedMap<Item> items = new Object2IntAVLTreeMap<>(
+		(a, b) -> Integer.compare(Item.getId(a), Item.getId(b))
+	);
 	private final List<ItemStack> nbtItems = new ArrayList<>();
 
-	private PrintArguments printArgs = PrintArguments.DEFAULT;
-	protected PrintStatus status = PrintStatus.UNCONSTRUCTED;
+	private volatile PrintArguments printArgs = PrintArguments.DEFAULT;
+	protected volatile PrintStatus status = PrintStatus.UNCONSTRUCTED;
 
 	private ItemStack blueprintItem = ItemStack.EMPTY;
-	private PrintableSchematic blueprint = null;
-	private Iterator<PrintableSchematic.BlockData> printing = null;
+	private volatile PrintableSchematic blueprint = null;
+	private PrintArguments activatedPrintArgs = null;
+	private Iterator<PrintableSchematic.BlockData> printingBlocks = null;
 	private Queue<ItemStack> pendingItems = null;
-	private ItemStack requiredItem = ItemStack.EMPTY;
-	private int progress = 0;
+	private volatile ItemStack requiredItem = ItemStack.EMPTY;
+	private volatile int progress = 0;
 
 	private int energyStored = 0;
 
@@ -92,6 +101,8 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	private AABB frameCache = null;
 	private int frameLevel = -1;
 	private int lastSignal = 0;
+	private Object peripheral = null;
+	private Runnable printFinishCallback = null;
 
 	public PrinterControllerBlockEntity(final BlockPos pos, final BlockState state) {
 		super(VSPRegistry.BlockEntities.PRINTER_CONTROLLER.get(), pos, state);
@@ -109,12 +120,16 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	public void sendPrintArgs(final PrintArguments args) {
 		this.setPrintArgs(args);
 		final CompoundTag data = this.printArgs.writeToNbt(new CompoundTag());
-		//
+		// TODO
 	}
 
 	public void setPrintArgs(final PrintArguments args) {
 		this.printArgs = args.validated();
-		this.markUpdated();
+		this.setChanged();
+	}
+
+	public PrintArguments getActivatedPrintArgs() {
+		return this.activatedPrintArgs;
 	}
 
 	public PrintStatus getStatus() {
@@ -127,6 +142,19 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		}
 		this.status = status;
 		this.markUpdated();
+	}
+
+	public boolean isWorking() {
+		return this.blueprint != null;
+	}
+
+	public double getProgress() {
+		final PrintableSchematic blueprint = this.blueprint;
+		final int progress = this.progress;
+		if (this.blueprint == null) {
+			return 0;
+		}
+		return (double) (progress) / blueprint.size();
 	}
 
 	public ItemStack getBlueprintItem() {
@@ -155,6 +183,20 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		return true;
 	}
 
+	/**
+	 * module-private
+	 */
+	public Object2IntSortedMap<Item> getItemUnits() {
+		return this.items;
+	}
+
+	/**
+	 * module-private
+	 */
+	public List<ItemStack> getSpecialItemUnits() {
+		return this.nbtItems;
+	}
+
 	public ItemStack getRequiredItem() {
 		return this.requiredItem;
 	}
@@ -168,15 +210,16 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		this.frameCache = null;
 		this.frameLevel = -1;
 		this.blueprint = null;
-		this.printing = null;
+		this.activatedPrintArgs = null;
+		this.printingBlocks = null;
 		this.pendingItems = null;
 		this.requiredItem = ItemStack.EMPTY;
 		this.progress = 0;
 		this.markUpdated();
 	}
 
-	protected int getScaledCount(int count) {
-		final double scale = this.printArgs.scale() * this.getPrinterScale();
+	protected int getScaledCount(final int count) {
+		final double scale = this.activatedPrintArgs.scale() * this.getPrinterScale();
 		return (int) (Math.ceil(count * (scale * scale * scale)));
 	}
 
@@ -228,7 +271,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	}
 
 	/**
-	 * try consume an item
+	 * Try to consume an item.
 	 *
 	 * @return {@code 0} if consume succeed, or the amount of unit missing
 	 */
@@ -317,7 +360,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	/**
 	 * Return the energy use to print one block.
-	 * The actualy energy usage will be scaled based on the scale difference.
+	 * The actual energy usage will be scaled based on the scale difference.
 	 *
 	 * @return the energy use to print standard block.
 	 */
@@ -328,6 +371,15 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 
 	public int getMaxEnergyStored() {
 		return this.getEnergyConsumeRate() * 2;
+	}
+
+	public final Object getOrCreatePeripheral() {
+		if (this.peripheral == null) {
+			final PrinterControllerPeripheral peripheral = new PrinterControllerPeripheral(this);
+			this.peripheral = peripheral;
+			this.printFinishCallback = peripheral::onPrintFinish;
+		}
+		return this.peripheral;
 	}
 
 	@Override
@@ -363,7 +415,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		if (data.contains("Blueprint")) {
 			this.blueprint = SchematicManager.get().getSchematic(data.getString("Blueprint"));
 			if (this.blueprint != null) {
-				this.printing = this.blueprint.stream().skip(this.progress).iterator();
+				this.printingBlocks = this.blueprint.stream().skip(this.progress).iterator();
 				this.pendingItems = new ArrayDeque<>();
 				for (final Tag tag : data.getList("PendingItems", Tag.TAG_COMPOUND)) {
 					final ItemStack stack = ItemStack.of((CompoundTag) (tag));
@@ -500,8 +552,8 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			return;
 		}
 		final int newSignal = level.getBestNeighborSignal(this.getBlockPos());
-		if (newSignal > 0 && this.lastSignal == 0 && this.blueprint == null) {
-			this.startPrint(SchematicManager.get().getSchematic(QuantumFilmItem.getBlueprint(this.blueprintItem)));
+		if (newSignal > 0 && this.lastSignal == 0 && !this.isWorking()) {
+			this.startPrint();
 		}
 		this.lastSignal = newSignal;
 	}
@@ -509,17 +561,17 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	public void serverTick() {
 		final ServerLevel level = (ServerLevel) this.getLevel();
 		if (this.status == PrintStatus.UNCONSTRUCTED) {
-			if (this.frameCheckCountdown <= 0) {
-				if (this.getBlockState().getValue(PrinterControllerBlock.FRAME) != NullableDirection.NULL && this.getFrameSpace() != null) {
-					this.setStatus(PrintStatus.IDLE);
-				} else {
-					this.frameCheckCountdown = 20;
-				}
-			} else {
+			if (this.frameCheckCountdown > 0) {
 				this.frameCheckCountdown--;
+				return;
 			}
+			if (this.getBlockState().getValue(PrinterControllerBlock.FRAME) == NullableDirection.NULL || this.getFrameSpace() == null) {
+				this.frameCheckCountdown = 20;
+				return;
+			}
+			this.setStatus(PrintStatus.IDLE);
 		}
-		if (this.printing == null) {
+		if (this.printingBlocks == null) {
 			return;
 		}
 		if (this.pendingItems == null) {
@@ -533,7 +585,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 				this.finishPrint();
 				return;
 			}
-			final List<ItemStack> itemsList = this.printing.next().requiredItems();
+			final List<ItemStack> itemsList = this.printingBlocks.next().requiredItems();
 			if (itemsList == null) {
 				this.setStatus(PrintStatus.INVALID);
 				return;
@@ -568,7 +620,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 				continue;
 			}
 			framed.transform(ship2world.mul(ship.getWorldToShip(), aabbMat), convertedFrame);
-			// TODO: not accurate enough
+			// TODO: not accurate enough?
 			if (!level.noCollision(new AABB(convertedFrame.minX, convertedFrame.minY, convertedFrame.minZ, convertedFrame.maxX, convertedFrame.maxY, convertedFrame.maxZ))) {
 				this.setStatus(PrintStatus.OBSTRUCTED);
 				return;
@@ -602,58 +654,71 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 	}
 
 	/**
-	 * Start printing model
+	 * Start print current blueprint.
+	 *
+	 * @return if the print process successfully initialized
+	 */
+	public boolean startPrint() {
+		return this.startPrint(SchematicManager.get().getSchematic(QuantumFilmItem.getBlueprint(this.blueprintItem)));
+	}
+
+	/**
+	 * Start print a specific blueprint.
 	 *
 	 * @param arg The print argument
+	 * @return if the print process successfully initialized
 	 */
-	public void startPrint(final PrintableSchematic blueprint) {
+	protected boolean startPrint(final PrintableSchematic blueprint) {
+		this.activatedPrintArgs = this.printArgs;
 		this.status = PrintStatus.IDLE;
 		if (blueprint == null) {
 			this.setStatus(PrintStatus.EMPTY_BLUEPRINT);
-			return;
+			return false;
 		}
 		final ServerLevel level = (ServerLevel) (this.getLevel());
 		final AABB frame = this.getFrameSpace();
 		if (frame == null) {
 			this.setStatus(PrintStatus.UNCONSTRUCTED);
-			return;
+			return false;
 		}
 
-		final double scale = this.printArgs.scale() * this.getPrinterScale();
+		final double scale = this.activatedPrintArgs.scale() * this.getPrinterScale();
 
 		if (scale < 0.1) {
 			this.setStatus(PrintStatus.SCALE_TOO_SMALL);
-			return;
+			return false;
 		}
 		if (scale > 10) {
 			this.setStatus(PrintStatus.SCALE_TOO_LARGE);
-			return;
+			return false;
 		}
 
 		final Vec3i blueprintDimension = blueprint.getDimension();
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
-			.scale(this.printArgs.scale())
-			.directionFromRotation((float) (this.printArgs.xRotate()) * 90f, (float) (this.printArgs.yRotate()) * 90f);
+			.scale(this.activatedPrintArgs.scale())
+			.xRot((float) (this.activatedPrintArgs.xRotate()) * 90f)
+			.yRot((float) (this.activatedPrintArgs.yRotate()) * 90f);
 		if (frame.getXsize() < Math.abs(dimension.x) || frame.getYsize() < Math.abs(dimension.y) || frame.getZsize() < Math.abs(dimension.z)) {
 			this.setStatus(PrintStatus.NOT_ENOUGH_SPACE);
-			return;
+			return false;
 		}
 
 		this.blueprint = blueprint;
-		this.printing = this.blueprint.stream().iterator();
+		this.printingBlocks = this.blueprint.stream().iterator();
 		this.pendingItems = null;
 		this.progress = 0;
 		this.markUpdated();
+		return true;
 	}
 
-	public boolean canFinishPrint() {
-		return !this.printing.hasNext();
+	protected boolean canFinishPrint() {
+		return !this.printingBlocks.hasNext();
 	}
 
 	public ServerShip finishPrint() {
 		final PrintableSchematic blueprint = this.blueprint;
 		this.blueprint = null;
-		this.printing = null;
+		this.printingBlocks = null;
 		this.pendingItems = null;
 		this.progress = 0;
 		this.markUpdated();
@@ -669,92 +734,69 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 			Constants.LOG.warn("Trying to print without a frame");
 			return null;
 		}
-		final double relativeScale = this.printArgs.scale();
+		final double relativeScale = this.activatedPrintArgs.scale();
 		final double scale = relativeScale * this.getPrinterScale();
 
 		final Vec3i blueprintDimension = blueprint.getDimension();
-		final float xRotate = (float) (this.printArgs.xRotate()) * 90f, yRotate = (float) (this.printArgs.yRotate()) * 90f;
+		final float xRotate = (float) (this.activatedPrintArgs.xRotate()) * 90f, yRotate = (float) (this.activatedPrintArgs.yRotate()) * 90f;
 		final Vec3 dimension = Vec3.atLowerCornerOf(blueprintDimension)
 			.scale(relativeScale)
 			.xRot(xRotate * Mth.DEG_TO_RAD)
 			.yRot(yRotate * Mth.DEG_TO_RAD);
 		final Vector3d worldOrigin = new Vector3d(
-			this.printArgs.xAlign().align(frame.minX, frame.maxX, dimension.x),
-			this.printArgs.yAlign().align(frame.minY, frame.maxY, dimension.y),
-			this.printArgs.zAlign().align(frame.minZ, frame.maxZ, dimension.z)
+			this.activatedPrintArgs.xAlign().align(frame.minX, frame.maxX, dimension.x),
+			this.activatedPrintArgs.yAlign().align(frame.minY, frame.maxY, dimension.y),
+			this.activatedPrintArgs.zAlign().align(frame.minZ, frame.maxZ, dimension.z)
 		);
 
-		final ServerShipWorldCore shipWorld = VSGameUtilsKt.getShipObjectWorld(level);
+		final VsiServerShipWorld shipWorld = VSGameUtilsKt.getShipObjectWorld(level);
 		final String levelId = VSGameUtilsKt.getDimensionId(level);
-		final ServerShip ship = shipWorld.createNewShipAtBlock(
-			new Vector3i((int) (worldOrigin.x), (int) (worldOrigin.y), (int) (worldOrigin.z)),
-			false,
-			scale,
-			levelId
-		);
-		ship.setSlug("+printed+" + blueprint.getFingerprint().substring(0, 8) + "+" + ship.getId());
-		final Vector3i shipCenter = ship.getChunkClaim().getCenterBlockCoordinates(VSGameUtilsKt.getYRange(level), new Vector3i());
-		final Vector3i shipOrigin = shipCenter.sub(blueprintDimension.getX() / 2, blueprintDimension.getY() / 2, blueprintDimension.getZ() / 2, new Vector3i());
+		final ShipAllocator.ServerShipHolder shipHolder = ShipAllocator.get(level.getServer()).allocShip();
+		final Vector3i shipCenter = shipHolder.getShipData().getChunkClaim().getCenterBlockCoordinates(VSGameUtilsKt.getYRange(level), new Vector3i());
 
-		final List<ISchematicDataBlockEntity> dataBlocks = blueprint.placeInLevel(level, new BlockPos(shipOrigin.x, shipOrigin.y, shipOrigin.z));
-
-		// TODO: this may not work correct on scaled ship
-		final Vector3d absPosition = worldOrigin
-			.add(
-				ship.getInertiaData().getCenterOfMassInShip()
-					.sub(shipOrigin.x - 0.5, shipOrigin.y - 0.5, shipOrigin.z - 0.5, new Vector3d())
-					.mul(scale),
-				new Vector3d()
-			);
-		final Vector3d position = new Vector3d(absPosition);
-		final Quaterniond rotation = new Quaterniond();
+		final Vector3d position = new Vector3d(worldOrigin);
+		final Quaterniond rotation0 = new Quaterniond();
 		if (xRotate != 0) {
-			rotation.rotationX(xRotate * Mth.DEG_TO_RAD);
+			rotation0.rotationX(xRotate * Mth.DEG_TO_RAD);
 			if (yRotate != 0) {
-				rotation.rotateY(yRotate * Mth.DEG_TO_RAD);
+				rotation0.rotateY(yRotate * Mth.DEG_TO_RAD);
 			}
 		} else if (yRotate != 0) {
-			rotation.rotationY(yRotate * Mth.DEG_TO_RAD);
+			rotation0.rotationY(yRotate * Mth.DEG_TO_RAD);
 		}
+		final Quaterniond rotation = new Quaterniond(rotation0);
 		final Vector3d velocity = new Vector3d();
 		final Vector3d omega = new Vector3d();
-		final Vector3d scaling = new Vector3d(relativeScale);
 
 		final ServerShip selfShip = VSGameUtilsKt.getShipManagingPos(level, this.getBlockPos());
 		if (selfShip != null) {
 			final ShipTransform selfTransform = selfShip.getTransform();
 			selfTransform.getShipToWorld().transformPosition(position);
-			rotation.set(selfTransform.getShipToWorldRotation());
+			rotation.mul(selfTransform.getShipToWorldRotation());
 			velocity.set(selfShip.getVelocity());
 			omega.set(selfShip.getOmega());
-			scaling.mul(selfTransform.getShipToWorldScaling());
 		}
-		shipWorld.teleportShip(ship, new ShipTeleportDataImpl(position, rotation, velocity, omega, levelId, scale));
 
-		// fix new ship's velocity and omega
-		if (velocity.lengthSquared() != 0 || omega.lengthSquared() != 0) {
-			ship.setTransformProvider(new ServerShipTransformProvider() {
-				@Override
-				public NextTransformAndVelocityData provideNextTransformAndVelocity(final ShipTransform transform, final ShipTransform nextTransform) {
-					if (!transform.getPositionInWorld().equals(nextTransform.getPositionInWorld()) || !transform.getShipToWorldRotation().equals(nextTransform.getShipToWorldRotation())) {
-						ship.setTransformProvider(null);
-						return null;
-					}
-					if (ship.getVelocity().lengthSquared() == 0 && ship.getOmega().lengthSquared() == 0) {
-						if (selfShip != null) {
-							final ShipTransform selfTransform2 = selfShip.getTransform();
-							selfTransform2.getShipToWorld().transformPosition(absPosition, position);
-							rotation.set(selfTransform2.getShipToWorldRotation());
-							velocity.set(selfShip.getVelocity());
-							omega.set(selfShip.getOmega());
-							scaling.set(relativeScale).mul(selfTransform2.getShipToWorldScaling());
-						}
-						return new NextTransformAndVelocityData(new ShipTransformImpl(position, nextTransform.getPositionInShip(), rotation, scaling), velocity, omega);
-					}
-					return null;
-				}
-			});
-		}
+		final BlockPos shipOriginBlock = new BlockPos(
+			shipCenter.x - blueprintDimension.getX() / 2,
+			shipCenter.y - blueprintDimension.getY() / 2,
+			shipCenter.z - blueprintDimension.getZ() / 2
+		);
+		// TODO: somehow ship origin is `lowCorner + dimension` instead of `lowCorner + dimension / 2` ??
+		// But it works anyway.
+		final Vector3d shipOrigin = new Vector3d(
+			shipOriginBlock.getX() + blueprintDimension.getX(),
+			shipOriginBlock.getY() + blueprintDimension.getY(),
+			shipOriginBlock.getZ() + blueprintDimension.getZ()
+		);
+		final ServerShip ship = shipHolder.consume(
+			"+printed+" + blueprint.getFingerprint().substring(0, 8) + "+" + shipHolder.getShipData().getId(),
+			ValkyrienSkiesMod.getVsCore().newShipTeleportData(
+				position, rotation, velocity, omega, levelId, scale, shipOrigin
+			)
+		);
+
+		final List<ISchematicDataBlockEntity> dataBlocks = blueprint.placeInLevel(level, shipOriginBlock);
 
 		for (final ISchematicDataBlockEntity dataBlock : dataBlocks) {
 			dataBlock.onPlacedByShip(selfShip, ship);
@@ -765,6 +807,9 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		}
 
 		this.setStatus(PrintStatus.IDLE);
+		if (this.printFinishCallback != null) {
+			this.printFinishCallback.run();
+		}
 		return ship;
 	}
 }

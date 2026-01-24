@@ -1,7 +1,6 @@
 package com.github.litermc.vsprinter.client;
 
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -17,7 +16,7 @@ public final class ClientRegistry {
 	@SubscribeEvent
 	public static void clientSetup(final FMLClientSetupEvent event) {
 		event.enqueueWork(() -> {
-			ItemBlockRenderTypes.setRenderLayer(VSPRegistry.Blocks.PRINTER_FRAME.get(), RenderType.cutout());
+			VSPRegistry.Blocks.onRegisterRenderType(ItemBlockRenderTypes::setRenderLayer);
 		});
 	}
 

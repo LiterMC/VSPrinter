@@ -68,4 +68,88 @@ public record PrintArguments(
 		data.putByte("YRotate", (byte) (this.yRotate));
 		return data;
 	}
+
+	public PrintArguments withScale(final float scale) {
+		return this.scale == scale ? this : new PrintArguments(
+			this.skipFluids,
+			this.skipMissing,
+			scale,
+			this.xAlign,
+			this.yAlign,
+			this.zAlign,
+			this.xRotate,
+			this.yRotate,
+			false
+		);
+	}
+
+	public PrintArguments withXAlign(final Alignment xAlign) {
+		return this.xAlign == xAlign ? this : new PrintArguments(
+			this.skipFluids,
+			this.skipMissing,
+			this.scale,
+			xAlign,
+			this.yAlign,
+			this.zAlign,
+			this.xRotate,
+			this.yRotate,
+			false
+		);
+	}
+
+	public PrintArguments withYAlign(final Alignment yAlign) {
+		return this.yAlign == yAlign ? this : new PrintArguments(
+			this.skipFluids,
+			this.skipMissing,
+			this.scale,
+			this.xAlign,
+			yAlign,
+			this.zAlign,
+			this.xRotate,
+			this.yRotate,
+			false
+		);
+	}
+
+	public PrintArguments withZAlign(final Alignment zAlign) {
+		return this.zAlign == zAlign ? this : new PrintArguments(
+			this.skipFluids,
+			this.skipMissing,
+			this.scale,
+			this.xAlign,
+			this.yAlign,
+			zAlign,
+			this.xRotate,
+			this.yRotate,
+			false
+		);
+	}
+
+	public PrintArguments withXRotate(final int xRotate) {
+		return this.xRotate == xRotate ? this : new PrintArguments(
+			this.skipFluids,
+			this.skipMissing,
+			this.scale,
+			this.xAlign,
+			this.yAlign,
+			this.zAlign,
+			xRotate,
+			this.yRotate,
+			false
+		);
+	}
+
+	public PrintArguments withYRotate(final int yRotate) {
+		return this.yRotate == yRotate ? this : new PrintArguments(
+			this.skipFluids,
+			this.skipMissing,
+			this.scale,
+			this.xAlign,
+			this.yAlign,
+			this.zAlign,
+			this.xRotate,
+			yRotate,
+			false
+		);
+	}
 }

@@ -84,7 +84,7 @@ public class PrinterControllerBlock extends Block implements EntityBlock {
 			self = self.setValue(FRAME, NullableDirection.NULL);
 			shouldInvalidate = true;
 		}
-		if (shouldInvalidate && level.getBlockEntity(selfPos) instanceof PrinterControllerBlockEntity be) {
+		if (shouldInvalidate && level.getBlockEntity(selfPos) instanceof final PrinterControllerBlockEntity be) {
 			be.invalidate();
 			if (frameDir == face) {
 				be.setStatus(isFrame ? PrintStatus.IDLE : PrintStatus.UNCONSTRUCTED);
@@ -95,7 +95,7 @@ public class PrinterControllerBlock extends Block implements EntityBlock {
 
 	@Override
 	public void neighborChanged(final BlockState state, final Level level, final BlockPos pos, final Block block, final BlockPos neighborPos, final boolean isMoving) {
-		if (level.getBlockEntity(pos) instanceof PrinterControllerBlockEntity controller) {
+		if (level.getBlockEntity(pos) instanceof final PrinterControllerBlockEntity controller) {
 			controller.neighborChanged(neighborPos);
 		}
 	}

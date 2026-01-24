@@ -5,6 +5,7 @@
 package com.github.litermc.vsprinter.platform;
 
 import com.github.litermc.vsprinter.Constants;
+import com.github.litermc.vsprinter.config.ConfigFile;
 import com.github.litermc.vsprinter.network.MessageType;
 import com.github.litermc.vsprinter.network.NetworkMessage;
 import com.github.litermc.vsprinter.network.client.ClientNetworkContext;
@@ -45,6 +46,7 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.ItemTags;
@@ -89,6 +91,11 @@ public final class PlatformHelperImpl implements PlatformHelper {
 	@Override
 	public boolean isDevelopmentEnvironment() {
 		return FabricLoader.getInstance().isDevelopmentEnvironment();
+	}
+
+	@Override
+	public ConfigFile.Builder createConfigBuilder() {
+		return new FabricConfigFile.Builder();
 	}
 
 	@Override
@@ -168,6 +175,11 @@ public final class PlatformHelperImpl implements PlatformHelper {
 	@Override
 	public CreativeModeTab.Builder newCreativeModeTab() {
 		return FabricItemGroup.builder();
+	}
+
+	@Override
+	public ServerPlayer createFakePlayer(ServerLevel world, GameProfile name) {
+		return FakePlayer.create(world, name);
 	}
 
 	private record RegistryWrapperImpl<T>(

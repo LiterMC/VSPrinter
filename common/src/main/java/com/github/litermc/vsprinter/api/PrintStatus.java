@@ -22,6 +22,10 @@ public enum PrintStatus {
 		this.key = key;
 	}
 
+	public String getId() {
+		return this.key;
+	}
+
 	public MutableComponent getText() {
 		return Component.translatable("vsprinter.status." + this.key + ".text");
 	}

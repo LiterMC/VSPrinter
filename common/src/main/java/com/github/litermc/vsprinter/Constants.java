@@ -3,9 +3,11 @@ package com.github.litermc.vsprinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Constants {
+public final class Constants {
 	public static final String MOD_ID = "vsprinter";
 	public static final String MOD_NAME = "VSPrinter";
-	public static final String MOD_VERSION = "0.1.0";
+	public static final String MOD_VERSION = "0.2.0";
 	public static final Logger LOG = LoggerFactory.getLogger(MOD_NAME);
+
+	private Constants() {}
 }

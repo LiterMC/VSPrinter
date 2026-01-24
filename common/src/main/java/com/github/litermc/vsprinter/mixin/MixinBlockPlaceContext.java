@@ -1,6 +1,6 @@
 package com.github.litermc.vsprinter.mixin;
 
-import com.github.litermc.vsprinter.ship.PrintedInfoAttachment;
+import com.github.litermc.vsprinter.attachment.PrintedInfoAttachment;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
@@ -53,7 +53,7 @@ public abstract class MixinBlockPlaceContext extends UseOnContext {
 			}
 			return;
 		}
-		final PrintedInfoAttachment info = serverShip.getAttachment(PrintedInfoAttachment.class);
+		final PrintedInfoAttachment info = PrintedInfoAttachment.get(serverShip);
 		if (info == null) {
 			return;
 		}

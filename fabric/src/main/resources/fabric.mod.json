@@ -17,18 +17,26 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.github.litermc.vsprinter.VSPrinterMod"
+			"${group}.ModEntry"
+		],
+		"client": [
+			"${group}.client.ClientModEntry"
 		]
 	},
 	"mixins": [
-		"${mod_id}.mixins.json"
+		"${mod_id}.mixins.json",
+		"${mod_id}.fabric.mixins.json"
 	],
 	"depends": {
 		"fabric": "*",
-		"fabricloader": ">=0.16",
-		"java": ">=17",
+		"fabricloader": ">=${fabric_loader_version}",
+		"java": ">=${java_version}",
 		"minecraft": "${minecraft_version}",
-		"valkyrienskies": "*"
+		"valkyrienskies": "[2.4,2.5)"
+	},
+	"recommends": {
+	},
+	"conflicts": {
 	}
 }
   

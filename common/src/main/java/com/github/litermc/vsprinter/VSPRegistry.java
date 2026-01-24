@@ -12,6 +12,7 @@ import com.github.litermc.vsprinter.platform.PlatformHelper;
 import com.github.litermc.vsprinter.platform.RegistrationHelper;
 import com.github.litermc.vsprinter.platform.RegistryEntry;
 
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -27,7 +28,11 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.PushReaction;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 public final class VSPRegistry {
 	private VSPRegistry() {}
@@ -61,6 +66,10 @@ public final class VSPRegistry {
 			)
 		);
 
+		public static void onRegisterRenderType(final BiConsumer<Block, RenderType> consumer) {
+			consumer.accept(PRINTER_FRAME.get(), RenderType.cutout());
+		}
+
 		private Blocks() {}
 	}
 
@@ -79,18 +88,25 @@ public final class VSPRegistry {
 
 	public static final class Items {
 		private static final RegistrationHelper<Item> REGISTRY = PlatformHelper.get().createRegistrationHelper(Registries.ITEM);
+		private static final List<RegistryEntry<? extends Item>> TAB_ITEMS = new ArrayList<>();
 
 		private static Item.Properties properties() {
 			return new Item.Properties();
 		}
 
 		private static <B extends Block, I extends Item> RegistryEntry<I> ofBlock(RegistryEntry<B> block, BiFunction<B, Item.Properties, I> supplier) {
-			return REGISTRY.register(block.id().getPath(), () -> supplier.apply(block.get(), properties()));
+			return register(block.id().getPath(), () -> supplier.apply(block.get(), properties()));
+		}
+
+		private static <I extends Item> RegistryEntry<I> register(final String id, final Supplier<I> supplier) {
+			final RegistryEntry<I> entry = REGISTRY.register(id, supplier);
+			TAB_ITEMS.add(entry);
+			return entry;
 		}
 
 		public static final RegistryEntry<BlockItem> PRINTER_CONTROLLER = ofBlock(Blocks.PRINTER_CONTROLLER, BlockItem::new);
 		public static final RegistryEntry<BlockItem> PRINTER_FRAME = ofBlock(Blocks.PRINTER_FRAME, BlockItem::new);
-		public static final RegistryEntry<Item> QUANTUM_FILM = REGISTRY.register("quantum_film", () -> new QuantumFilmItem(
+		public static final RegistryEntry<Item> QUANTUM_FILM = register("quantum_film", () -> new QuantumFilmItem(
 			properties().stacksTo(1).rarity(Rarity.UNCOMMON)
 		));
 

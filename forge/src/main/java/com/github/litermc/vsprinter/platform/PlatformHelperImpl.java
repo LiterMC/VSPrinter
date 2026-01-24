@@ -5,6 +5,7 @@
 package com.github.litermc.vsprinter.platform;
 
 import com.github.litermc.vsprinter.Constants;
+import com.github.litermc.vsprinter.config.ConfigFile;
 import com.github.litermc.vsprinter.network.MessageType;
 import com.github.litermc.vsprinter.network.NetworkMessage;
 import com.github.litermc.vsprinter.network.client.ClientNetworkContext;
@@ -90,6 +91,11 @@ public class PlatformHelperImpl implements PlatformHelper {
 	}
 
 	@Override
+	public ConfigFile.Builder createConfigBuilder() {
+		return new ForgeConfigFile.Builder();
+	}
+
+	@Override
 	public MinecraftServer getCurrentServer() {
 		return ServerLifecycleHooks.getCurrentServer();
 	}
@@ -157,6 +163,11 @@ public class PlatformHelperImpl implements PlatformHelper {
 	@Override
 	public CreativeModeTab.Builder newCreativeModeTab() {
 		return CreativeModeTab.builder();
+	}
+
+	@Override
+	public ServerPlayer createFakePlayer(ServerLevel world, GameProfile profile) {
+		return FakePlayer.create(world, profile);
 	}
 
 	private record RegistryWrapperImpl<T>(

@@ -8,7 +8,9 @@ import com.github.litermc.vsprinter.network.MessageType;
 import com.github.litermc.vsprinter.network.NetworkMessage;
 import com.github.litermc.vsprinter.network.client.ClientNetworkContext;
 import com.github.litermc.vsprinter.network.container.ContainerData;
+import com.github.litermc.vsprinter.config.ConfigFile;
 
+import com.mojang.authlib.GameProfile;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
@@ -18,6 +20,8 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -50,6 +54,13 @@ public interface PlatformHelper {
 	 * @return If we're running in a development environment.
 	 */
 	boolean isDevelopmentEnvironment();
+
+	/**
+	 * Create a new config builder.
+	 *
+	 * @return The newly created config builder.
+	 */
+	ConfigFile.Builder createConfigBuilder();
 
 	MinecraftServer getCurrentServer();
 
@@ -163,6 +174,26 @@ public interface PlatformHelper {
 	 * @return The creative tab builder.
 	 */
 	CreativeModeTab.Builder newCreativeModeTab();
+
+	/**
+	* Create a new fake player.
+	*
+	* @param level   The level the player should be created in.
+	* @param profile The user this player should mimic.
+	* @return The newly constructed fake player.
+	*/
+	ServerPlayer createFakePlayer(ServerLevel level, GameProfile profile);
+
+	/**
+	* Determine if a player is not a real player.
+	*
+	* @param player The player to check.
+	* @return Whether this player is fake.
+	*/
+	default boolean isFakePlayer(ServerPlayer player) {
+		// Any subclass of ServerPlayer (i.e. Forge's FakePlayer) is assumed to be a fake.
+		return player.connection == null || player.getClass() != ServerPlayer.class;
+	}
 
 	final class Instance {
 		static final @Nullable PlatformHelper INSTANCE;

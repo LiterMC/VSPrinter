@@ -97,6 +97,10 @@ public class PrinterFrameBlock extends Block {
 
 	@Override
 	public VoxelShape getShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
+		// VS does not support dynamic shape
+		if (level.getBlockState(pos) != state) {
+			return Shapes.empty();
+		}
 		final AABBi box = state.getValue(CONTROLLER) != NullableDirection.NULL && state.getValue(VALID) ? getFrameBox(level, pos) : null;
 		final int frameLevel = box == null ? 0 : getFrameLevel(box);
 		if (frameLevel >= 3) {

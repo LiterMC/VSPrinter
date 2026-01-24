@@ -1,11 +1,11 @@
 package com.github.litermc.vsprinter.api;
 
-import com.github.litermc.vsprinter.compat.Compats;
+import com.github.litermc.vsprinter.compat.CompatMods;
 import com.github.litermc.vsprinter.compat.create.CreateCompat;
 import com.github.litermc.vsprinter.util.BlockPosBitSet;
 import com.github.litermc.vsprinter.util.IntRef;
 
-import com.simibubi.create.content.schematics.requirement.ISpecialBlockItemRequirement;
+import com.simibubi.create.api.schematic.requirement.SpecialBlockItemRequirement;
 
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
@@ -18,6 +18,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 import org.joml.primitives.AABBic;
 
@@ -89,7 +91,7 @@ public class PrintableSchematic {
 			if (block instanceof ISchematicSpecialBlock specialBlock) {
 				return specialBlock.getPrintRequiredUnits(this.blockState, this.data);
 			}
-			if (Compats.CREATE.isLoaded() && block instanceof ISpecialBlockItemRequirement specialBlock) {
+			if (CompatMods.CREATE.isLoaded() && block instanceof SpecialBlockItemRequirement specialBlock) {
 				return CreateCompat.convertItemRequirementToUnits(specialBlock.getRequiredItems(this.blockState, null));
 			}
 			return getBlockDefaultRequiredUnits(this.blockState);
@@ -102,7 +104,11 @@ public class PrintableSchematic {
 		if (item == Items.AIR) {
 			return null;
 		}
-		return List.of(StackUtil.setStackToUnits(new ItemStack(item, 1)));
+		final ItemStack stack = new ItemStack(item, 1);
+		if (state.getOptionalValue(BlockStateProperties.SLAB_TYPE).orElse(null) == SlabType.DOUBLE) {
+			stack.setCount(2);
+		}
+		return List.of(StackUtil.setStackToUnits(stack));
 	}
 
 	public static PrintableSchematic fromLevel(final Level level, final AABBic area) {

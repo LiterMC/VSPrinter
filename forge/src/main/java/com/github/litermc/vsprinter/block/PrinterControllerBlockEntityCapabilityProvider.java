@@ -3,6 +3,7 @@ package com.github.litermc.vsprinter.block;
 import com.github.litermc.vsprinter.Constants;
 import com.github.litermc.vsprinter.VSPRegistry;
 import com.github.litermc.vsprinter.api.StackUtil;
+import com.github.litermc.vsprinter.compat.CompatMods;
 
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -15,25 +16,33 @@ import net.minecraftforge.energy.IEnergyStorage;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.items.IItemHandler;
 
+import dan200.computercraft.shared.Capabilities;
+
 public final class PrinterControllerBlockEntityCapabilityProvider implements ICapabilityProvider {
 	public static final ResourceLocation CAPABILITY_ID = new ResourceLocation(Constants.MOD_ID, "printer_controller");
 
 	private final PrinterControllerBlockEntity be;
 	private final LazyOptional<IItemHandler> itemHandler;
 	private final LazyOptional<IEnergyStorage> energyStorage;
+	private final LazyOptional<Object> lazyPeripheral;
 
 	private PrinterControllerBlockEntityCapabilityProvider(final PrinterControllerBlockEntity be) {
 		this.be = be;
 		this.itemHandler = LazyOptional.of(() -> new ItemHandler(this.be));
 		this.energyStorage = LazyOptional.of(() -> new EnergyStorage(this.be));
+		this.lazyPeripheral = LazyOptional.of(this.be::getOrCreatePeripheral);
 	}
 
 	@Override
 	public <T> LazyOptional<T> getCapability(final Capability<T> cap, final Direction side) {
 		if (cap == ForgeCapabilities.ITEM_HANDLER) {
 			return this.itemHandler.cast();
-		} else if (cap == ForgeCapabilities.ENERGY) {
+		}
+		if (cap == ForgeCapabilities.ENERGY) {
 			return this.energyStorage.cast();
+		}
+		if (CompatMods.COMPUTERCRAFT.isLoaded() && cap == Capabilities.CAPABILITY_PERIPHERAL) {
+			return this.lazyPeripheral.cast();
 		}
 		return LazyOptional.empty();
 	}
@@ -41,6 +50,7 @@ public final class PrinterControllerBlockEntityCapabilityProvider implements ICa
 	private void invalidate() {
 		this.itemHandler.invalidate();
 		this.energyStorage.invalidate();
+		this.lazyPeripheral.invalidate();
 	}
 
 	public static void onGatherCapabilities(final AttachCapabilitiesEvent<PrinterControllerBlockEntity> event) {
