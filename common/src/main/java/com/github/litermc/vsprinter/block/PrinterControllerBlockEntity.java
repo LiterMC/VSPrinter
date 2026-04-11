@@ -410,6 +410,7 @@ public class PrinterControllerBlockEntity extends BlockEntity implements Clearab
 		} else {
 			this.printArgs = PrintArguments.DEFAULT;
 		}
+		this.activatedPrintArgs = this.printArgs;
 		this.status = PrintStatus.values()[data.getByte("Status")];
 		this.blueprintItem = data.contains("BlueprintItem") ? ItemStack.of(data.getCompound("BlueprintItem")) : ItemStack.EMPTY;
 		if (data.contains("Blueprint")) {

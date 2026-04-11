@@ -15,6 +15,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
@@ -33,7 +34,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-
+import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -67,12 +68,23 @@ public class PrinterControllerRenderer implements BlockEntityRenderer<PrinterCon
 		final BlockPos blockPos = be.getBlockPos();
 		final FrontAndTop frontAndTop = be.getBlockState().getValue(PrinterControllerBlock.ORIENTATION);
 		final PrintStatus status = be.getStatus();
-		final int displayLight = 0xf000f0;
+		final int displayLight = LightTexture.FULL_BRIGHT;
 
 		poseStack.pushPose();
 		poseStack.translate(0.5f, 0.5f, 0.5f);
-		poseStack.mulPose(frontAndTop.top().getRotation());
-		poseStack.mulPose(frontAndTop.front().getRotation());
+		
+		Direction front = frontAndTop.front();
+		Direction up = frontAndTop.top();
+		Direction right = getRightDirection(frontAndTop);
+		int fx = front.getStepX(), fy = front.getStepY(), fz = front.getStepZ();
+		int ux = up.getStepX(), uy = up.getStepY(), uz = up.getStepZ();
+		int rx = right.getStepX(), ry = right.getStepY(), rz = right.getStepZ();
+		poseStack.mulPoseMatrix(new Matrix4f(
+			rx, ry, rz, 0,
+			ux, uy, uz, 0,
+			-fx, -fy, -fz, 0,
+			0, 0, 0, 1
+		));
 		poseStack.translate(0, 0, -0.501f);
 
 		poseStack.pushPose();
@@ -118,6 +130,7 @@ public class PrinterControllerRenderer implements BlockEntityRenderer<PrinterCon
 					poseStack.popPose();
 				}
 			}
+			default -> {}
 		}
 
 		poseStack.popPose();
@@ -215,5 +228,22 @@ public class PrinterControllerRenderer implements BlockEntityRenderer<PrinterCon
 				}
 			}
 		});
+	}
+
+	private static Direction getRightDirection(FrontAndTop fat) {
+		return switch (fat) {
+			case DOWN_EAST -> Direction.SOUTH;
+			case DOWN_NORTH -> Direction.EAST;
+			case DOWN_SOUTH -> Direction.WEST;
+			case DOWN_WEST -> Direction.NORTH;
+			case UP_EAST -> Direction.NORTH;
+			case UP_NORTH -> Direction.WEST;
+			case UP_SOUTH -> Direction.EAST;
+			case UP_WEST -> Direction.SOUTH;
+			case WEST_UP -> Direction.NORTH;
+			case EAST_UP -> Direction.SOUTH;
+			case NORTH_UP -> Direction.EAST;
+			case SOUTH_UP -> Direction.WEST;
+		};
 	}
 }
